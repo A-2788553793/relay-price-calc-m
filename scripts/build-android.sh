@@ -55,7 +55,15 @@ keytool -genkeypair -noprompt -storetype PKCS12 \
 
 # cargo-apk release requires a signing key even though its first signed APK is
 # not distributed. We re-align its unsigned input and then sign the aligned APK.
-cargo apk build --locked --lib --release --target aarch64-linux-android --features ui
+# cargo-apk 0.10 does not accept --locked, so enforce the lockfile around it:
+# fetch with --locked first, then fail if the build modified Cargo.lock.
+cargo fetch --locked --target aarch64-linux-android
+lock_sum_before="$(sha256sum Cargo.lock)"
+cargo apk build --lib --release --target aarch64-linux-android --features ui
+if [[ "$(sha256sum Cargo.lock)" != "$lock_sum_before" ]]; then
+    printf '%s\n' 'Cargo.lock changed during cargo apk build; refusing to continue.' >&2
+    exit 1
+fi
 mapfile -d '' -t unaligned_apks < <(python3 - "$CARGO_TARGET_DIR" <<'PY'
 import pathlib
 import sys
