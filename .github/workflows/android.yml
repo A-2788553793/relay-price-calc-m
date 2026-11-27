@@ -51,10 +51,8 @@ jobs:
       - name: Use isolated Android SDK directory
         run: |
           sdk="$RUNNER_TEMP/relay-price-calc-m-android-sdk"
-          printf 'ANDROID_HOME=%s
-' "$sdk" >> "$GITHUB_ENV"
-          printf 'ANDROID_SDK_ROOT=%s
-' "$sdk" >> "$GITHUB_ENV"
+          printf 'ANDROID_HOME=%s\n' "$sdk" >> "$GITHUB_ENV"
+          printf 'ANDROID_SDK_ROOT=%s\n' "$sdk" >> "$GITHUB_ENV"
 
       - name: Set up pinned Android SDK and NDK
         uses: android-actions/setup-android@v3
