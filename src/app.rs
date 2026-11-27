@@ -61,7 +61,7 @@ fn refresh(window: &MainWindow, state: &FormState, models: &UiModels) {
                 model.set_row_data(field_index, row);
             }
         }
-        let mut card = models.cards.row_data(model_index).expect("固定四个模型");
+        let mut card = models.cards.row_data(model_index).expect("固定两个模型");
         // Preserve nested model identity and avoid resetting focused editors on every keystroke.
         let name = state.models[model_index].name.as_str();
         let coefficient = state.coefficient_text(model_index);

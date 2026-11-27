@@ -145,7 +145,7 @@ fn mobile_ui_callbacks_rendering_and_resizing() {
     // create_window is intentionally memory-only: no test touches real app storage.
     let window = create_window().unwrap();
     window.show().unwrap();
-    assert_eq!(window.get_models().row_count(), 4);
+    assert_eq!(window.get_models().row_count(), 2);
     assert_eq!(window.get_ranking().row_count(), 0);
     for model in window.get_models().iter() {
         assert_eq!(model.fields.row_count(), 5);
@@ -154,13 +154,11 @@ fn mobile_ui_callbacks_rendering_and_resizing() {
     for (index, text) in ["3", "15", "3.75", "0.3", "80"].iter().enumerate() {
         window.invoke_field_edited(0, index as i32, (*text).into());
     }
-    for (index, price) in [(1, "20"), (2, "30"), (3, "40")] {
-        window.invoke_field_edited(index, 1, price.into());
-    }
+    window.invoke_field_edited(1, 1, "20".into());
     assert_eq!(coefficient(&window, 0), "6.84");
     assert_eq!(coefficient(&window, 1), "20");
-    assert_eq!(coefficient(&window, 2), "30");
-    assert_eq!(coefficient(&window, 3), "40");
+    assert!(window.get_models().row_data(2).is_none());
+    assert!(window.get_models().row_data(3).is_none());
     assert!(window.get_ranking().row_data(0).unwrap().best);
     assert_eq!(
         window.get_ranking().row_data(0).unwrap().coefficient,
@@ -200,11 +198,11 @@ fn mobile_ui_callbacks_rendering_and_resizing() {
     snapshot(&adapter, "invalid", 390, 844);
     window.invoke_field_edited(0, 4, "８０％".into());
     assert_eq!(coefficient(&window, 0), "6.84");
-    window.invoke_name_edited(3, "第四个模型".into());
-    assert_eq!(window.get_models().row_data(3).unwrap().name, "第四个模型");
-    window.invoke_clear_model_requested(2);
-    assert_eq!(coefficient(&window, 2), "—");
-    assert_eq!(window.get_ranking().row_count(), 3);
+    window.invoke_name_edited(1, "第二个模型".into());
+    assert_eq!(window.get_models().row_data(1).unwrap().name, "第二个模型");
+    window.invoke_clear_model_requested(1);
+    assert_eq!(coefficient(&window, 1), "—");
+    assert_eq!(window.get_ranking().row_count(), 1);
     assert_eq!(coefficient(&window, 0), "6.84");
     window.invoke_clear_requested();
     assert_eq!(window.get_ranking().row_count(), 0);
@@ -220,7 +218,7 @@ fn mobile_ui_callbacks_rendering_and_resizing() {
     snapshot(&adapter, "small-toolbar", 320, 640);
     assert_toolbar(&window, 320.0, 640.0);
     window.set_text_size(14);
-    window.invoke_field_edited(3, 0, "8".into());
+    window.invoke_field_edited(1, 0, "8".into());
     snapshot(&adapter, "before-clear-click", 390, 844);
     assert_toolbar(&window, 390.0, 844.0);
     click(
@@ -233,7 +231,7 @@ fn mobile_ui_callbacks_rendering_and_resizing() {
         0,
         "real clear-all click empties ranking"
     );
-    assert_eq!(coefficient(&window, 3), "—");
+    assert_eq!(coefficient(&window, 1), "—");
     snapshot(&adapter, "cleared", 390, 844);
     // Fixed two-row toolbar at scale 1: Settings, About, Clear all.
     click(
@@ -468,7 +466,7 @@ fn mobile_ui_callbacks_rendering_and_resizing() {
     snapshot(&adapter, "keyboard-drag-bottom", 390, 360);
 
     // Unbroken Chinese names wrap instead of eliding; all pages scale together.
-    for index in 0..4 {
+    for index in 0..2 {
         window.invoke_name_edited(
             index,
             "这是一个用于验证窄屏大字号仍然完整换行显示的超长中文模型名称"

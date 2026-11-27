@@ -64,14 +64,14 @@ fn callbacks_save_immediately_and_reopened_window_restores_inputs_names_and_sett
         !dir.0.join("config.json").exists(),
         "opening alone must not overwrite any file"
     );
-    window.invoke_name_edited(3, "保存模型四".into());
-    window.invoke_field_edited(3, 0, " ３.５ ".into());
+    window.invoke_name_edited(1, "保存模型二".into());
+    window.invoke_field_edited(1, 0, " ３.５ ".into());
     window.invoke_field_edited(0, 4, "not-a-number".into());
     window.invoke_settings_edited(true, 18);
     let loaded = ConfigStore::in_directory(&dir.0).load().config;
-    assert_eq!(loaded.form.models[3].values[0], " ３.５ ");
+    assert_eq!(loaded.form.models[1].values[0], " ３.５ ");
     assert_eq!(loaded.form.models[0].values[4], "not-a-number");
-    assert_eq!(loaded.form.models[3].name, "保存模型四");
+    assert_eq!(loaded.form.models[1].name, "保存模型二");
     assert!(loaded.dark_mode);
     assert_eq!(loaded.text_size, 18);
     assert!(window.get_storage_status().contains("已自动保存"));
@@ -80,13 +80,13 @@ fn callbacks_save_immediately_and_reopened_window_restores_inputs_names_and_sett
     assert!(reopened.get_dark_mode());
     assert_eq!(reopened.get_text_size(), 18);
     assert_eq!(
-        reopened.get_models().row_data(3).unwrap().name,
-        "保存模型四"
+        reopened.get_models().row_data(1).unwrap().name,
+        "保存模型二"
     );
     assert_eq!(
         reopened
             .get_models()
-            .row_data(3)
+            .row_data(1)
             .unwrap()
             .fields
             .row_data(0)
@@ -94,11 +94,12 @@ fn callbacks_save_immediately_and_reopened_window_restores_inputs_names_and_sett
             .value,
         " ３.５ "
     );
+    assert_eq!(reopened.get_models().row_count(), 2);
     assert!(!reopened.get_models().row_data(0).unwrap().error.is_empty());
-    reopened.invoke_clear_model_requested(3);
+    reopened.invoke_clear_model_requested(1);
     let cleared = ConfigStore::in_directory(&dir.0).load().config;
-    assert_eq!(cleared.form.models[3].name, "保存模型四");
-    assert!(cleared.form.models[3].values.iter().all(String::is_empty));
+    assert_eq!(cleared.form.models[1].name, "保存模型二");
+    assert!(cleared.form.models[1].values.iter().all(String::is_empty));
     assert_eq!(cleared.form.models[0].values[4], "not-a-number");
     reopened.invoke_clear_requested();
     let cleared = ConfigStore::in_directory(&dir.0).load().config;
@@ -111,7 +112,9 @@ fn callbacks_save_immediately_and_reopened_window_restores_inputs_names_and_sett
     assert_eq!(cleared.text_size, 18);
     let before = fs::read(dir.0.join("config.json")).unwrap();
     reopened.invoke_field_edited(-1, 0, "9".into());
-    reopened.invoke_name_edited(4, "bad".into());
+    reopened.invoke_name_edited(2, "bad".into());
+    reopened.invoke_field_edited(3, 0, "9".into());
+    reopened.invoke_clear_model_requested(2);
     reopened.invoke_clear_model_requested(-1);
     assert_eq!(fs::read(dir.0.join("config.json")).unwrap(), before);
     drop(reopened);
@@ -156,7 +159,7 @@ fn callbacks_save_immediately_and_reopened_window_restores_inputs_names_and_sett
         .unwrap()
         .error
         .is_empty());
-    typed.invoke_field_edited(3, 4, "80".into());
+    typed.invoke_field_edited(1, 4, "80".into());
     click(
         &adapter,
         typed.get_clear_all_button_x(),
@@ -187,8 +190,8 @@ fn callbacks_save_immediately_and_reopened_window_restores_inputs_names_and_sett
         "清空保留名称"
     );
     assert_eq!(
-        restored_clear.get_models().row_data(3).unwrap().name,
-        "保存模型四"
+        restored_clear.get_models().row_data(1).unwrap().name,
+        "保存模型二"
     );
     restored_clear.hide().unwrap();
     drop(restored_clear);
@@ -209,8 +212,8 @@ fn callbacks_save_immediately_and_reopened_window_restores_inputs_names_and_sett
     let failing = create_window_with_store(ConfigStore::in_directory(&failing_dir)).unwrap();
     // Introduce an obstructing directory after load, so the save itself fails.
     fs::create_dir(failing_dir.join("config.json")).unwrap();
-    failing.invoke_field_edited(2, 0, "7".into());
-    assert_eq!(failing.get_models().row_data(2).unwrap().coefficient, "7");
+    failing.invoke_field_edited(1, 0, "7".into());
+    assert_eq!(failing.get_models().row_data(1).unwrap().coefficient, "7");
     assert!(failing.get_storage_status().contains("自动保存失败"));
     assert!(!failing.get_storage_status().contains("已自动保存"));
     assert!(failing_dir.join("config.json").is_dir());

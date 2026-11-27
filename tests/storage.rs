@@ -45,10 +45,10 @@ fn missing_file_uses_defaults_without_writing() {
     assert!(store.is_persistent());
 }
 #[test]
-fn round_trip_keeps_four_models_names_raw_invalid_values_and_settings() {
+fn round_trip_keeps_two_models_names_raw_invalid_values_and_settings() {
     let dir = Directory::new();
     let mut config = AppConfig::default();
-    for index in 0..4 {
+    for index in 0..2 {
         config.form.rename(index, format!("中文模型{index}"));
         config.form.set(index, 0, " ３.５ ".into());
         config.form.set(index, 4, "invalid%".into());
@@ -59,12 +59,34 @@ fn round_trip_keeps_four_models_names_raw_invalid_values_and_settings() {
     assert_eq!(dir.store().load().config, config);
 }
 #[test]
+fn legacy_four_model_config_loads_first_two_and_saves_only_two() {
+    let dir = Directory::new();
+    let original = r#"{"version":1,"form":{"models":[{"name":"保留甲","values":[" ３.５ ","15","3.75","0.3","80"]},{"name":"保留乙","values":["invalid","20"]},{"name":"旧模型三","values":["0"]},{"name":"旧模型四","values":["0"]}]},"dark_mode":true,"text_size":18}"#;
+    fs::write(dir.config(), original).unwrap();
+    let mut store = dir.store();
+    let loaded = store.load();
+    assert!(store.is_persistent());
+    assert_eq!(loaded.config.form.models.len(), 2);
+    assert_eq!(loaded.config.form.models[0].name, "保留甲");
+    assert_eq!(loaded.config.form.models[0].values[0], " ３.５ ");
+    assert_eq!(loaded.config.form.models[1].name, "保留乙");
+    assert_eq!(loaded.config.form.models[1].values[0], "invalid");
+    assert!(loaded.config.dark_mode);
+    assert_eq!(loaded.config.text_size, 18);
+    assert_eq!(fs::read_to_string(dir.config()).unwrap(), original);
+    store.save(&loaded.config).unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_slice(&fs::read(dir.config()).unwrap()).unwrap();
+    assert_eq!(saved["form"]["models"].as_array().unwrap().len(), 2);
+    assert_eq!(dir.store().load().config, loaded.config);
+}
+#[test]
 fn edits_replace_atomically_without_leftover_temporary_files() {
     let dir = Directory::new();
     let store = dir.store();
     let mut config = AppConfig::default();
     for value in ["1", "1.", "12.34", "", "101%"] {
-        config.form.set(3, 4, value.into());
+        config.form.set(1, 4, value.into());
         store.save(&config).unwrap();
         assert_eq!(dir.store().load().config, config);
     }
@@ -78,19 +100,19 @@ fn independent_and_global_clear_persist_without_losing_names_or_settings() {
         text_size: 18,
         ..AppConfig::default()
     };
-    for index in 0..4 {
+    for index in 0..2 {
         config.form.rename(index, format!("保留{index}"));
         config.form.set(index, 1, "20".into());
     }
-    config.form.clear_model(2);
+    config.form.clear_model(0);
     dir.store().save(&config).unwrap();
     let loaded = dir.store().load().config;
-    assert!(loaded.form.models[2].values.iter().all(String::is_empty));
+    assert!(loaded.form.models[0].values.iter().all(String::is_empty));
     assert_eq!(loaded.form.models[1].values[1], "20");
     config.form.clear();
     dir.store().save(&config).unwrap();
     assert_eq!(dir.store().load().config, config);
-    assert_eq!(config.form.model_name(2), "保留2");
+    assert_eq!(config.form.model_name(0), "保留0");
     assert!(config.dark_mode);
 }
 #[test]
@@ -99,7 +121,7 @@ fn omitted_fields_and_short_arrays_are_defaulted() {
     fs::write(dir.config(), r#"{"form":{"models":[{"values":["5"]}]}}"#).unwrap();
     let config = dir.store().load().config;
     assert_eq!(config.form.models[0].values[0], "5");
-    assert_eq!(config.form.model_name(3), "模型4");
+    assert_eq!(config.form.model_name(1), "模型2");
     assert_eq!(config.text_size, 14);
 }
 #[test]

@@ -2,7 +2,7 @@
 use crate::calc::{format_coefficient, is_equal, parse_number, rank, saving_percent, Prices};
 use serde::{Deserialize, Deserializer, Serialize};
 
-pub const MODEL_COUNT: usize = 4;
+pub const MODEL_COUNT: usize = 2;
 pub const FIELDS: [&str; 5] = ["输入", "输出", "缓存写入", "缓存读取", "平均缓存率"];
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -105,7 +105,7 @@ impl Default for FormState {
 pub struct Summary {
     pub headline: String,
     pub detail: String,
-    /// -1=有效模型不足且有错误，0=未填/单条/并列，1..=4=唯一最便宜的模型。
+    /// -1=有效模型不足且有错误，0=未填/单条/并列，1..=2=唯一最便宜的模型。
     pub winner: i32,
 }
 

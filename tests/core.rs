@@ -21,12 +21,8 @@ fn input(values: [&str; 5]) -> ModelInput {
 }
 
 fn form_with_coefficients(first: &str, second: &str) -> FormState {
-    form_with_four_coefficients([first, second, "", ""])
-}
-
-fn form_with_four_coefficients(values: [&str; MODEL_COUNT]) -> FormState {
     let mut form = FormState::default();
-    for (index, value) in values.into_iter().enumerate() {
+    for (index, value) in [first, second].into_iter().enumerate() {
         form.set(index, 1, value.into());
     }
     form
@@ -80,8 +76,6 @@ fn updated_formula_changes_the_winner_against_an_output_only_model() {
         models: [
             input(["3", "15", "3.75", "0.3", "80"]),
             input(["", "10", "", "", ""]),
-            ModelInput::default(),
-            ModelInput::default(),
         ],
     };
     assert_eq!(form.coefficient_text(0), "6.84");
@@ -390,9 +384,14 @@ fn model_input_propagates_arithmetic_overflow_without_fabricating_a_number() {
 }
 
 #[test]
-fn default_form_has_four_distinct_names_and_no_participating_models() {
+fn default_form_has_two_distinct_names_and_no_participating_models() {
     let form = FormState::default();
-    assert_eq!(MODEL_COUNT, 4);
+    assert_eq!(MODEL_COUNT, 2);
+    assert_eq!(form.models.len(), 2);
+    assert_eq!(
+        form.models.each_ref().map(|model| model.name.as_str()),
+        ["模型1", "模型2"]
+    );
     for (index, model) in form.models.iter().enumerate() {
         assert_eq!(model.name, format!("模型{}", index + 1));
         assert!(model.is_empty());
@@ -442,9 +441,9 @@ fn setting_each_field_recalculates_coefficients_and_winners_immediately() {
 }
 
 #[test]
-fn all_four_models_can_be_edited_and_become_the_unique_winner() {
+fn both_models_can_be_edited_and_become_the_unique_winner() {
     for index in 0..MODEL_COUNT {
-        let mut form = form_with_four_coefficients(["10", "10", "10", "10"]);
+        let mut form = form_with_coefficients("10", "10");
         form.set(index, 1, "3".into());
         assert_eq!(form.summary().winner, (index + 1) as i32);
         assert_eq!(form.ranking()[0].index, index);
@@ -456,34 +455,37 @@ fn all_four_models_can_be_edited_and_become_the_unique_winner() {
 fn setting_unknown_indexes_leaves_the_form_unchanged() {
     let mut form = form_with_coefficients("3", "4");
     let before = form.clone();
-    for (model, field) in [
-        (MODEL_COUNT, 0),
-        (0, 5),
-        (usize::MAX, 0),
-        (0, usize::MAX),
-        (usize::MAX, usize::MAX),
-    ] {
+    for model in [2, 3, usize::MAX] {
+        form.set(model, 0, "bad".into());
+        form.clear_model(model);
+        form.rename(model, "bad".into());
+        assert_eq!(form, before, "out-of-range model {model}");
+        assert_eq!(form.summary(), before.summary());
+        assert_eq!(form.ranking(), before.ranking());
+        assert_eq!(form.coefficient_text(model), "—");
+        assert!(!form.model_name(model).is_empty());
+    }
+    for (model, field) in [(0, 5), (1, 5), (0, usize::MAX), (usize::MAX, usize::MAX)] {
         form.set(model, field, "bad".into());
-        form.clear_model(MODEL_COUNT);
-        form.rename(usize::MAX, "bad".into());
         assert_eq!(form, before);
         assert_eq!(form.summary(), before.summary());
     }
-    assert_eq!(form.coefficient_text(usize::MAX), "—");
 }
 
 #[test]
 fn invalid_form_fields_only_exclude_the_affected_model() {
     for bad_model in 0..MODEL_COUNT {
         for field in 0..FIELDS.len() {
-            let mut form = form_with_four_coefficients(["3", "4", "5", "6"]);
+            let mut form = form_with_coefficients("3", "4");
             let before = form.clone();
             form.set(bad_model, field, "bad".into());
             assert_eq!(form.models[bad_model].field_error(field), "请输入有效数字");
             assert_eq!(form.coefficient_text(bad_model), "—");
             assert_eq!(form.ranking().len(), MODEL_COUNT - 1);
             assert!(!form.ranking().iter().any(|entry| entry.index == bad_model));
-            assert_eq!(form.summary().winner, if bad_model == 0 { 2 } else { 1 });
+            assert_eq!(form.summary().winner, -1);
+            assert_eq!(form.summary().headline, "请先修正标红的数值");
+            assert_eq!(form.ranking()[0].index, 1 - bad_model);
             assert!(form
                 .summary()
                 .detail
@@ -502,7 +504,7 @@ fn invalid_form_fields_only_exclude_the_affected_model() {
 fn fixing_invalid_input_restores_live_comparison_in_every_model() {
     for bad_model in 0..MODEL_COUNT {
         for (field, bad) in [(0, "bad"), (1, "-1"), (4, "101")] {
-            let mut form = form_with_four_coefficients(["3", "4", "5", "6"]);
+            let mut form = form_with_coefficients("3", "4");
             let baseline = form.clone();
             form.set(bad_model, field, bad.into());
             assert_eq!(form.coefficient_text(bad_model), "—");
@@ -521,7 +523,7 @@ fn fixing_invalid_input_restores_live_comparison_in_every_model() {
 #[test]
 fn clear_removes_all_values_and_errors_but_preserves_all_names() {
     for invalid in [false, true] {
-        let mut form = form_with_four_coefficients(["3", "4", "5", "6"]);
+        let mut form = form_with_coefficients("3", "4");
         for index in 0..MODEL_COUNT {
             form.rename(index, format!("自定义{index}"));
         }
@@ -551,7 +553,7 @@ fn clear_removes_all_values_and_errors_but_preserves_all_names() {
 #[test]
 fn clear_model_preserves_its_name_and_every_other_model() {
     for index in 0..MODEL_COUNT {
-        let mut form = form_with_four_coefficients(["3", "4", "5", "6"]);
+        let mut form = form_with_coefficients("3", "4");
         form.rename(index, "保留名字".into());
         form.set(index, 4, "bad".into());
         let before = form.clone();
@@ -647,7 +649,7 @@ fn summary_rounding_distinguishes_tiny_savings_from_a_rounded_tenth_percent() {
 #[test]
 fn form_overflow_is_excluded_without_corrupting_other_models() {
     for bad_model in 0..MODEL_COUNT {
-        let mut form = form_with_four_coefficients(["3", "4", "5", "6"]);
+        let mut form = form_with_coefficients("3", "4");
         let before = form.clone();
         form.set(bad_model, 0, "1e308".into());
         form.set(bad_model, 1, "1e308".into());
@@ -656,7 +658,9 @@ fn form_overflow_is_excluded_without_corrupting_other_models() {
             "数值过大，无法计算"
         );
         assert_eq!(form.coefficient_text(bad_model), "—");
-        assert_eq!(form.ranking().len(), 3);
+        assert_eq!(form.ranking().len(), 1);
+        assert_eq!(form.ranking()[0].index, 1 - bad_model);
+        assert_eq!(form.summary().winner, -1);
         assert!(form.summary().detail.contains("有 1 个模型数值有误"));
         for other in 0..MODEL_COUNT {
             if other != bad_model {
@@ -681,14 +685,20 @@ fn whitespace_only_values_are_skipped_even_with_a_custom_name() {
 
 #[test]
 fn explicit_zero_is_a_valid_participant_but_an_empty_model_is_not() {
-    let form = form_with_four_coefficients(["", "0", "", "5"]);
-    let ranked = form.ranking();
-    assert_eq!(ranked.len(), 2);
-    assert_eq!(ranked[0].index, 1);
-    assert_eq!(ranked[0].coefficient, 0.0);
-    assert_eq!(form.summary().winner, 2);
-    assert_eq!(form.coefficient_text(0), "—");
-    assert_eq!(form.coefficient_text(1), "0");
+    for zero_index in 0..MODEL_COUNT {
+        let mut form = FormState::default();
+        form.set(zero_index, 1, "0".into());
+        let ranked = form.ranking();
+        assert_eq!(ranked.len(), 1);
+        assert_eq!(ranked[0].index, zero_index);
+        assert_eq!(ranked[0].coefficient, 0.0);
+        assert_eq!(form.summary().winner, 0);
+        assert_eq!(form.coefficient_text(1 - zero_index), "—");
+        assert_eq!(form.coefficient_text(zero_index), "0");
+        form.set(1 - zero_index, 1, "5".into());
+        assert_eq!(form.ranking().len(), 2);
+        assert_eq!(form.summary().winner, (zero_index + 1) as i32);
+    }
 }
 
 #[test]
@@ -707,50 +717,49 @@ fn a_single_participant_cannot_be_declared_the_winner() {
 
 #[test]
 fn insufficient_valid_models_and_errors_use_error_summary_and_counts() {
-    for valid in ["", "3"] {
-        let form = form_with_four_coefficients(["bad", "-1", valid, ""]);
+    for second in ["", "3", "-1", "NaN", "inf"] {
+        let form = form_with_coefficients("bad", second);
+        let errors = if ["", "3"].contains(&second) { 1 } else { 2 };
+        assert_eq!(form.ranking().len(), usize::from(second == "3"));
         assert_eq!(form.summary().winner, -1);
         assert_eq!(form.summary().headline, "请先修正标红的数值");
         assert!(form
             .summary()
             .detail
-            .contains("有 2 个模型数值有误，未参与比较"));
+            .contains(&format!("有 {errors} 个模型数值有误，未参与比较")));
     }
-    let form = form_with_four_coefficients(["bad", "-1", "NaN", "inf"]);
-    assert!(form.ranking().is_empty());
-    assert_eq!(form.summary().winner, -1);
-    assert!(form
-        .summary()
-        .detail
-        .contains("有 4 个模型数值有误，未参与比较"));
 }
 
 #[test]
-fn two_valid_models_still_compare_when_the_other_two_are_invalid() {
-    let form = form_with_four_coefficients(["bad", "-1", "3", "4"]);
-    assert_eq!(form.summary().winner, 3);
-    assert_eq!(form.summary().headline, "模型3 最便宜");
-    assert!(form
-        .summary()
-        .detail
-        .contains("有 2 个模型数值有误，未参与比较"));
-    assert_eq!(
-        form.ranking()
-            .iter()
-            .map(|entry| entry.index)
-            .collect::<Vec<_>>(),
-        [2, 3]
-    );
+fn nonexistent_third_and_fourth_models_cannot_affect_two_valid_models() {
+    let mut form = form_with_coefficients("3", "4");
+    let before = form.clone();
+    for index in [2, 3] {
+        form.set(index, 1, "bad".into());
+        form.rename(index, "不存在".into());
+        form.clear_model(index);
+        assert_eq!(form, before);
+        assert_eq!(form.summary().winner, 1);
+        assert_eq!(form.summary().headline, "模型1 最便宜");
+        assert_eq!(form.summary().detail, "便宜约 25.0% · 以较贵模型为基准");
+        assert_eq!(
+            form.ranking()
+                .iter()
+                .map(|entry| entry.index)
+                .collect::<Vec<_>>(),
+            [0, 1]
+        );
+    }
 }
 
 #[test]
-fn four_model_rankings_assign_competition_places_and_stable_ties() {
+fn two_model_rankings_assign_places_and_stable_ties() {
     for (values, indexes, places) in [
-        (["3", "1", "1", "2"], [1, 2, 3, 0], [1, 1, 3, 4]),
-        (["3", "2", "2", "1"], [3, 1, 2, 0], [1, 2, 2, 4]),
-        (["4", "3", "2", "1"], [3, 2, 1, 0], [1, 2, 3, 4]),
+        (["3", "1"], [1, 0], [1, 2]),
+        (["1", "3"], [0, 1], [1, 2]),
+        (["2", "2"], [0, 1], [1, 1]),
     ] {
-        let ranked = form_with_four_coefficients(values).ranking();
+        let ranked = form_with_coefficients(values[0], values[1]).ranking();
         assert_eq!(
             ranked.iter().map(|entry| entry.index).collect::<Vec<_>>(),
             indexes
@@ -767,21 +776,40 @@ fn four_model_rankings_assign_competition_places_and_stable_ties() {
 }
 
 #[test]
-fn tied_best_models_use_both_names_and_no_unique_winner() {
-    let mut form = form_with_four_coefficients(["3", "1", "1", "2"]);
-    form.rename(1, "乙".into());
-    form.rename(2, "丙".into());
-    assert_eq!(form.summary().winner, 0);
-    assert_eq!(form.summary().headline, "乙、丙 最便宜");
-    let ranked = form.ranking();
-    assert!(ranked[0].is_best && ranked[1].is_best);
-    assert_eq!(ranked[2].saving_text, "最便宜的比它便宜约 50.0%");
-    assert_eq!(ranked[3].saving_text, "最便宜的比它便宜约 66.7%");
+fn generic_rank_preserves_multi_value_order_and_stable_ties() {
+    for (values, indexes) in [
+        ([3.0, 1.0, 1.0, 2.0], [1, 2, 3, 0]),
+        ([3.0, 2.0, 2.0, 1.0], [3, 1, 2, 0]),
+        ([4.0, 3.0, 2.0, 1.0], [3, 2, 1, 0]),
+    ] {
+        let ranked = rank(&values.map(Some));
+        assert_eq!(
+            ranked.iter().map(|entry| entry.index).collect::<Vec<_>>(),
+            indexes
+        );
+    }
 }
 
 #[test]
-fn all_four_equal_models_have_no_saving_or_unique_winner() {
-    let form = form_with_four_coefficients(["2", "2", "2", "2"]);
+fn tied_named_models_have_no_unique_winner_or_savings() {
+    let mut form = form_with_coefficients("1", "1");
+    form.rename(0, "乙".into());
+    form.rename(1, "丙".into());
+    assert_eq!(form.model_name(0), "乙");
+    assert_eq!(form.model_name(1), "丙");
+    assert_eq!(form.summary().winner, 0);
+    assert_eq!(form.summary().headline, "参与比较的模型一样贵");
+    assert_eq!(form.summary().detail, "价格系数相同");
+    let ranked = form.ranking();
+    assert_eq!(ranked.len(), 2);
+    assert!(ranked
+        .iter()
+        .all(|entry| entry.is_best && entry.saving_text == "—"));
+}
+
+#[test]
+fn both_equal_models_have_no_saving_or_unique_winner() {
+    let form = form_with_coefficients("2", "2");
     assert_eq!(form.summary().winner, 0);
     assert_eq!(form.summary().headline, "参与比较的模型一样贵");
     assert_eq!(
@@ -789,7 +817,7 @@ fn all_four_equal_models_have_no_saving_or_unique_winner() {
             .iter()
             .map(|entry| entry.index)
             .collect::<Vec<_>>(),
-        [0, 1, 2, 3]
+        [0, 1]
     );
     assert!(form
         .ranking()
@@ -799,21 +827,34 @@ fn all_four_equal_models_have_no_saving_or_unique_winner() {
 
 #[test]
 fn near_tie_groups_restore_original_order_without_merging_epsilon_chains() {
-    let form = form_with_four_coefficients(["1.00000000000075", "1", "1.0000000000015", "3"]);
-    let ranked = form.ranking();
+    // The generic rank API still accepts more than the two form models.
+    let ranked = rank(&[
+        Some(1.00000000000075),
+        Some(1.0000000000015),
+        Some(1.0),
+        Some(3.0),
+    ]);
     assert_eq!(
         ranked.iter().map(|entry| entry.index).collect::<Vec<_>>(),
-        [0, 1, 2, 3]
+        [0, 2, 1, 3]
     );
-    assert!(ranked[0].is_best && ranked[1].is_best);
-    assert!(!ranked[2].is_best);
+    assert!(is_equal(ranked[0].coefficient, ranked[1].coefficient));
+    assert!(is_equal(ranked[0].coefficient, ranked[2].coefficient));
+    assert!(!is_equal(ranked[1].coefficient, ranked[2].coefficient));
+    let form = form_with_coefficients("1.00000000000075", "1");
     assert_eq!(
-        ranked.iter().map(|entry| entry.place).collect::<Vec<_>>(),
-        [1, 1, 2, 4]
+        form.ranking()
+            .iter()
+            .map(|entry| entry.index)
+            .collect::<Vec<_>>(),
+        [0, 1]
     );
+    assert!(form
+        .ranking()
+        .iter()
+        .all(|entry| entry.is_best && entry.place == 1));
     assert_eq!(form.summary().winner, 0);
-    assert_eq!(form.summary().headline, "模型1、模型2 最便宜");
-    assert_eq!(ranked[2].saving_text, "最便宜的比它便宜不到0.1%");
+    assert_eq!(form.summary().headline, "参与比较的模型一样贵");
 }
 
 #[test]
@@ -875,57 +916,66 @@ fn equality_helper_matches_compare_and_saving_handles_zero_baselines() {
 
 #[test]
 fn ranking_savings_use_true_minimum_even_if_the_first_entry_is_nearly_tied() {
-    let form = form_with_four_coefficients(["1.00000000000075", "1", "2", ""]);
-    let ranked = form.ranking();
+    let ranked = rank(&[Some(1.00000000000075), Some(1.0), Some(2.0)]);
     assert_eq!(ranked[0].index, 0);
     assert!(ranked[0].coefficient > ranked[1].coefficient);
-    assert_eq!(ranked[2].saving_text, "最便宜的比它便宜约 50.0%");
+    let best = ranked
+        .iter()
+        .map(|entry| entry.coefficient)
+        .reduce(f64::min)
+        .unwrap();
+    assert_eq!(best, 1.0);
+    assert_eq!(saving_percent(best, ranked[2].coefficient), 50.0);
+    let form = form_with_coefficients("1", "2");
+    assert_eq!(form.ranking()[1].saving_text, "最便宜的比它便宜约 50.0%");
     assert_eq!(form.summary().detail, "便宜约 50.0% · 以较贵模型为基准");
 }
 
 #[test]
 fn custom_names_are_displayed_trimmed_with_position_specific_empty_fallbacks() {
-    let mut form = form_with_four_coefficients(["4", "3", "2", "1"]);
+    let mut form = form_with_coefficients("4", "1");
     for index in 0..MODEL_COUNT {
         form.rename(index, "　 \t".into());
         assert_eq!(form.model_name(index), format!("模型{}", index + 1));
     }
-    form.rename(3, "  自定义最便宜  ".into());
-    assert_eq!(form.models[3].name, "  自定义最便宜  ");
-    assert_eq!(form.model_name(3), "自定义最便宜");
+    form.rename(1, "  自定义最便宜  ".into());
+    assert_eq!(form.models[1].name, "  自定义最便宜  ");
+    assert_eq!(form.model_name(1), "自定义最便宜");
     assert_eq!(form.summary().headline, "自定义最便宜 最便宜");
-    assert_eq!(form.summary().winner, 4);
+    assert_eq!(form.summary().winner, 2);
 }
 
 #[test]
 fn rename_limits_unicode_characters_without_changing_values_or_other_models() {
-    let mut form = form_with_four_coefficients(["4", "3", "2", "1"]);
-    let before = form.clone();
-    form.rename(2, "😀中".repeat(20));
-    assert_eq!(form.models[2].name, "😀中".repeat(15));
-    assert_eq!(form.models[2].name.chars().count(), 30);
-    assert_eq!(form.models[2].values, before.models[2].values);
-    for other in [0, 1, 3] {
-        assert_eq!(form.models[other], before.models[other]);
+    for index in 0..MODEL_COUNT {
+        let mut form = form_with_coefficients("4", "1");
+        let before = form.clone();
+        form.rename(index, "😀中".repeat(20));
+        assert_eq!(form.models[index].name, "😀中".repeat(15));
+        assert_eq!(form.models[index].name.chars().count(), 30);
+        assert_eq!(form.models[index].values, before.models[index].values);
+        assert_eq!(form.models[1 - index], before.models[1 - index]);
+        form.models[index].name = "长".repeat(50);
+        assert_eq!(form.model_name(index).chars().count(), 30);
     }
-    form.models[2].name = "长".repeat(50);
-    assert_eq!(form.model_name(2).chars().count(), 30);
 }
 
 #[test]
 fn duplicate_names_do_not_merge_models_or_change_winner_indexes() {
-    let mut form = form_with_four_coefficients(["4", "3", "2", "1"]);
+    let mut form = form_with_coefficients("4", "1");
     for index in 0..MODEL_COUNT {
         form.rename(index, "同名".into());
     }
-    assert_eq!(form.summary().winner, 4);
-    assert_eq!(form.ranking().len(), 4);
+    assert_eq!(form.summary().winner, 2);
+    assert_eq!(form.ranking().len(), 2);
 }
 
 #[test]
 fn serialization_roundtrip_preserves_names_raw_text_and_invalid_values() {
-    let mut form = form_with_four_coefficients([" ８０％ ", "invalid", "1e-3", "0.30"]);
-    form.rename(2, "自定义😀".into());
+    let mut form = form_with_coefficients(" ８０％ ", "invalid");
+    form.rename(1, "自定义😀".into());
+    form.models[0].values[2] = "1e-3".into();
+    form.models[1].values[3] = "0.30".into();
     form.models[0].values[0] = " \t ".into();
     let json = serde_json::to_string(&form).unwrap();
     assert_eq!(serde_json::from_str::<FormState>(&json).unwrap(), form);
@@ -953,8 +1003,8 @@ fn deserialization_missing_fields_uses_position_specific_defaults() {
         form.models[1].values,
         ["7", "", "", "", ""].map(String::from)
     );
-    assert_eq!(form.models[2], FormState::default().models[2]);
-    assert_eq!(form.models[3], FormState::default().models[3]);
+    let short: FormState = serde_json::from_str(r#"{"models":[{}]}"#).unwrap();
+    assert_eq!(short.models[1], FormState::default().models[1]);
 }
 
 #[test]
@@ -965,7 +1015,8 @@ fn deserialization_pads_short_arrays_and_truncates_long_arrays() {
         form.models[0].values,
         ["1", "2", "3", "4", "5"].map(String::from)
     );
-    assert_eq!(form.models[3].name, "模型4");
+    assert_eq!(form.models.len(), 2);
+    assert_eq!(form.models[1].name, "模型2");
     assert_eq!(
         serde_json::from_str::<FormState>(r#"{"models":[]}"#).unwrap(),
         FormState::default()
@@ -975,34 +1026,53 @@ fn deserialization_pads_short_arrays_and_truncates_long_arrays() {
 }
 
 #[test]
-fn valid_equal_models_keep_equal_summary_even_if_other_models_are_invalid() {
-    let form = form_with_four_coefficients(["bad", "2", "2", "NaN"]);
-    assert_eq!(form.summary().winner, 0);
-    assert_eq!(form.summary().headline, "参与比较的模型一样贵");
+fn two_equal_models_recover_equal_summary_after_each_invalid_model_is_fixed() {
+    let mut form = form_with_coefficients("bad", "NaN");
+    assert!(form.ranking().is_empty());
+    assert_eq!(form.summary().winner, -1);
+    form.set(0, 1, "2".into());
+    assert_eq!(form.ranking().len(), 1);
+    assert_eq!(form.summary().winner, -1);
     assert!(form
         .summary()
         .detail
-        .contains("有 2 个模型数值有误，未参与比较"));
+        .contains("有 1 个模型数值有误，未参与比较"));
+    form.set(1, 1, "2".into());
+    assert_eq!(form.summary().winner, 0);
+    assert_eq!(form.summary().headline, "参与比较的模型一样贵");
+    assert_eq!(form.summary().detail, "价格系数相同");
     assert_eq!(form.ranking().len(), 2);
     assert!(form.ranking().iter().all(|entry| entry.is_best));
 }
 
 #[test]
 fn ranking_does_not_treat_tiny_positive_values_as_zero_or_equal() {
-    let form = form_with_four_coefficients(["2e-300", "0", "1e-300", ""]);
-    let ranked = form.ranking();
-    assert_eq!(
-        ranked.iter().map(|entry| entry.index).collect::<Vec<_>>(),
-        [1, 2, 0]
-    );
-    assert_eq!(
-        ranked.iter().map(|entry| entry.place).collect::<Vec<_>>(),
-        [1, 2, 3]
-    );
-    assert_eq!(form.summary().winner, 2);
-    assert_eq!(form.coefficient_text(0), "2.000e-300");
-    assert_eq!(form.coefficient_text(1), "0");
-    assert_eq!(ranked[1].saving_text, "最便宜的比它便宜约 100.0%");
+    for (first, second, indexes, saving) in [
+        ("2e-300", "0", [1, 0], "最便宜的比它便宜约 100.0%"),
+        ("2e-300", "1e-300", [1, 0], "最便宜的比它便宜约 50.0%"),
+        ("1e-300", "2e-300", [0, 1], "最便宜的比它便宜约 50.0%"),
+    ] {
+        let form = form_with_coefficients(first, second);
+        let ranked = form.ranking();
+        assert_eq!(
+            ranked.iter().map(|entry| entry.index).collect::<Vec<_>>(),
+            indexes
+        );
+        assert_eq!(
+            ranked.iter().map(|entry| entry.place).collect::<Vec<_>>(),
+            [1, 2]
+        );
+        assert_eq!(form.summary().winner, (indexes[0] + 1) as i32);
+        assert_eq!(
+            form.coefficient_text(0),
+            format_coefficient(first.parse().unwrap())
+        );
+        assert_eq!(
+            form.coefficient_text(1),
+            format_coefficient(second.parse().unwrap())
+        );
+        assert_eq!(ranked[1].saving_text, saving);
+    }
 }
 
 #[test]
