@@ -328,6 +328,11 @@ fn mobile_ui_callbacks_rendering_and_resizing() {
     click(&adapter, 180.0, field_y);
     key(&adapter, "7");
     assert_eq!(
+        window.get_first_field_text(),
+        "7",
+        "visible editor receives typed value"
+    );
+    assert_eq!(
         coefficient(&window, 0),
         "7",
         "real input event changes coefficient"
@@ -339,6 +344,52 @@ fn mobile_ui_callbacks_rendering_and_resizing() {
     );
     assert_eq!(coefficient(&window, 0), "—", "real per-model clear button");
     assert_eq!(window.get_ranking().row_count(), 0);
+    snapshot(&adapter, "typed-per-model-cleared", 390, 844);
+    assert!(
+        window.get_first_field_text().is_empty(),
+        "per-model clear must empty the visible editor after actual typing"
+    );
+    // Repeated edits after clearing must keep both directions alive, including
+    // external model changes while the editor is focused and invalid text.
+    click(&adapter, 180.0, window.get_first_field_y());
+    key(&adapter, "9");
+    assert_eq!(window.get_first_field_text(), "9");
+    assert_eq!(coefficient(&window, 0), "9");
+    window.invoke_field_edited(0, 0, "12".into());
+    snapshot(&adapter, "focused-external-update", 390, 844);
+    assert_eq!(window.get_first_field_text(), "12");
+    key(&adapter, "\u{f72b}"); // End
+    key(&adapter, "\u{0008}");
+    key(&adapter, "\u{0008}");
+    key(&adapter, "-");
+    key(&adapter, "3");
+    assert_eq!(window.get_first_field_text(), "-3");
+    assert_eq!(coefficient(&window, 0), "—");
+    click(
+        &adapter,
+        window.get_clear_all_button_x(),
+        window.get_clear_all_button_y(),
+    );
+    snapshot(&adapter, "typed-all-cleared", 390, 844);
+    assert!(
+        window.get_first_field_text().is_empty(),
+        "clear-all must empty an edited invalid field on screen"
+    );
+    assert_eq!(window.get_ranking().row_count(), 0);
+    click(&adapter, 180.0, window.get_first_field_y());
+    key(&adapter, "4");
+    assert_eq!(window.get_first_field_text(), "4");
+    assert_eq!(coefficient(&window, 0), "4");
+    click(
+        &adapter,
+        window.get_clear_all_button_x(),
+        window.get_clear_all_button_y(),
+    );
+    snapshot(&adapter, "typed-all-cleared-again", 390, 844);
+    assert!(
+        window.get_first_field_text().is_empty(),
+        "repeated clear-all must stay synchronized"
+    );
     // Exercise text editing, not only an invoked Rust callback.
     click(&adapter, 180.0, window.get_first_name_y());
     key(&adapter, "甲");

@@ -63,27 +63,23 @@ component PriceRow inherits VerticalLayout {
     in property <string> label;
     in property <string> error;
     in property <string> unit;
-    in-out property <string> value;
+    // The model owns the value. Editing must not replace this parent binding.
+    in property <string> value;
+    changed value => { if input.text != root.value { input.text = root.value; } }
     out property <length> input-y: input.absolute-position.y + input.height / 2;
+    out property <string> input-text: input.text;
     callback edited(string);
     spacing: 4px;
     Text { text: root.label + (root.unit == "" ? "" : "（" + root.unit + "）"); color: Theme.text; font-size: 14px * Theme.scale; wrap: word-wrap; }
-    Rectangle {
-        height: 48px * Theme.scale;
-        border-color: root.error != "" ? Theme.error : Theme.border;
-        border-width: root.error != "" ? 2px : 1px;
-        border-radius: 8px;
-        background: Theme.surface;
-        input := LineEdit {
-            x: 2px; y: 2px;
-            width: parent.width - 4px; height: parent.height - 4px;
-            min-width: 0px;
-            font-size: 14px * Theme.scale;
-            text <=> root.value;
-            placeholder-text: root.unit == "%" ? "0 ~ 100" : "0";
-            input-type: decimal;
-            edited(text) => { root.edited(text); }
-        }
+    // Fluent LineEdit already supplies a border and focus indicator.
+    input := LineEdit {
+        height: max(44px, 48px * Theme.scale);
+        min-width: 0px;
+        font-size: 14px * Theme.scale;
+        text: root.value;
+        placeholder-text: root.unit == "%" ? "0 ~ 100" : "0";
+        input-type: decimal;
+        edited(text) => { root.edited(text); }
     }
     Text { text: root.error; min-height: 16px * Theme.scale; color: Theme.error; font-size: 12px * Theme.scale; wrap: word-wrap; }
 }
@@ -95,6 +91,7 @@ component ModelPanel inherits Rectangle {
     out property <string> name-text: name-input.text;
     changed model => { if name-input.text != root.model.name { name-input.text = root.model.name; } }
     out property <length> field-y: first-field.input-y;
+    out property <string> field-text: first-field.input-text;
     out property <length> clear-x: clear-button.absolute-position.x + clear-button.width / 2;
     out property <length> clear-y: clear-button.absolute-position.y + clear-button.height / 2;
     callback edited(int, string);
@@ -204,6 +201,7 @@ export component MainWindow inherits Window {
     out property <length> first-name-y: first-card.name-y;
     out property <string> first-name-text: first-card.name-text;
     out property <length> first-field-y: first-card.field-y;
+    out property <string> first-field-text: first-card.field-text;
     out property <length> first-clear-x: first-card.clear-x;
     out property <length> first-clear-y: first-card.clear-y;
     out property <length> scroll-top: content-scroll.absolute-position.y;
@@ -318,7 +316,7 @@ export component MainWindow inherits Window {
                 mouse-drag-pan-enabled: true;
                 VerticalLayout {
                     alignment: start; padding-right: 4px; spacing: 16px;
-                    Text { text: "relay-price-calc-m 0.2.0\nRust + Slint · Android 版"; color: Theme.text; font-size: 18px * Theme.scale; font-weight: 700; wrap: word-wrap; }
+                    Text { text: "relay-price-calc-m 0.2.1\nRust + Slint · Android 版"; color: Theme.text; font-size: 18px * Theme.scale; font-weight: 700; wrap: word-wrap; }
                     CopyText { text: "四模型价格比较 · 应用源码 MIT License\n\n项目主页\nhttps://github.com/A-2788553793/relay-price-calc-m\n\n基于上游项目\nhttps://github.com/A-2788553793/relay-price-calc"; }
                     project-button := ActionButton { text: "在浏览器打开项目主页"; clicked => { root.open-project-requested(); } }
                     CopyText { text: "纯离线计算，不收集数据，不申请联网权限。模型输入与外观设置自动保存在应用私有目录，卸载应用或清除应用数据会删除它们。\n\n内嵌 Noto Sans CJK SC 字体（SIL Open Font License）。\n\nBuilt with Slint"; }

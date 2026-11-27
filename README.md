@@ -91,6 +91,6 @@ Slint 使用 Royalty-free Desktop, Mobile, and Web Applications License 2.0；�
 
 ## 验证状态
 
-v0.2.0 同步四模型、排名、自动保存及设置；保留 v0.1.2 中文字体与触屏拖动方案、v0.1.1 新公式。APK 和正式发布状态见 [Releases](https://github.com/A-2788553793/relay-price-calc-m/releases)。详细验证和未测项目见 VERIFICATION.md 与 ANDROID-CHECKLIST.md。
+v0.2.1 修复实际键入后“清除此项 / 全部清空”只清数据、未清屏幕文字的问题，并移除输入框重复外框，保留标准控件的边框和焦点提示。补充键入→清除→可见文字 / 保存文件 / 重开恢复的联通回归；继续保留 v0.2.0 四模型、排名、自动保存和设置，以及原公式、中文字体与触屏拖动。APK 和正式发布状态见 [Releases](https://github.com/A-2788553793/relay-price-calc-m/releases)。详细验证和未测项目见 VERIFICATION.md 与 ANDROID-CHECKLIST.md。
 
 软件渲染、单元测试及 APK 静态校验不等于 Android 真机验收：输入法、真实触摸、系统栏、进程终止后的恢复和外部浏览器仍需设备检查。助手不会自动卸载或安装应用。
