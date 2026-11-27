@@ -1,6 +1,6 @@
 [package]
 name = "relay-price-calc-m"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 rust-version = "1.90"
 description = "Rust + Slint Android 中转站模型价格比较工具"
