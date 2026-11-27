@@ -22,10 +22,6 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       RUST_BACKTRACE: 1
-      # An isolated SDK prevents cargo-apk from selecting a newer preinstalled
-      # build-tools/platform version from the hosted runner's shared SDK.
-      ANDROID_HOME: ${{ runner.temp }}/relay-price-calc-m-android-sdk
-      ANDROID_SDK_ROOT: ${{ runner.temp }}/relay-price-calc-m-android-sdk
 
     steps:
       - name: Check out source
@@ -48,6 +44,17 @@ jobs:
             libxkbcommon-x11-dev libx11-xcb-dev libxcb-render0-dev \
             libxcb-shape0-dev libxcb-xfixes0-dev libxcb-xkb-dev \
             libgl1-mesa-dev libegl1-mesa-dev
+
+      # An isolated SDK prevents cargo-apk from selecting a newer preinstalled
+      # build-tools/platform version from the hosted runner's shared SDK.
+      # (runner.temp is not available in job-level env, so export it here.)
+      - name: Use isolated Android SDK directory
+        run: |
+          sdk="$RUNNER_TEMP/relay-price-calc-m-android-sdk"
+          printf 'ANDROID_HOME=%s
+' "$sdk" >> "$GITHUB_ENV"
+          printf 'ANDROID_SDK_ROOT=%s
+' "$sdk" >> "$GITHUB_ENV"
 
       - name: Set up pinned Android SDK and NDK
         uses: android-actions/setup-android@v3
