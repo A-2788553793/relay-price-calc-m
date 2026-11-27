@@ -92,6 +92,9 @@ jobs:
       - name: Install cargo-apk 0.10.0
         run: cargo install --locked cargo-apk --version 0.10.0
 
+      - name: Check pinned cargo-apk CLI compatibility
+        run: python3 scripts/check-build-cli.py
+
       - name: Build and verify test-signed arm64 APK
         run: bash scripts/build-android.sh
 

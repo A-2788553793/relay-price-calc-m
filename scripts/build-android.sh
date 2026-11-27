@@ -55,15 +55,15 @@ keytool -genkeypair -noprompt -storetype PKCS12 \
 
 # cargo-apk release requires a signing key even though its first signed APK is
 # not distributed. We re-align its unsigned input and then sign the aligned APK.
-# cargo-apk 0.10 does not accept --locked, so enforce the lockfile around it:
-# fetch with --locked first, then fail if the build modified Cargo.lock.
+# cargo-apk 0.10.0 does NOT accept --locked (exit code 2). Prepare the
+# locked dependency graph with Cargo, then ensure packaging did not change it.
 cargo fetch --locked --target aarch64-linux-android
-lock_sum_before="$(sha256sum Cargo.lock)"
+lock_sha256="$(sha256sum Cargo.lock)"
 cargo apk build --lib --release --target aarch64-linux-android --features ui
-if [[ "$(sha256sum Cargo.lock)" != "$lock_sum_before" ]]; then
-    printf '%s\n' 'Cargo.lock changed during cargo apk build; refusing to continue.' >&2
+[[ "$(sha256sum Cargo.lock)" == "$lock_sha256" ]] || {
+    printf '%s\n' 'Cargo.lock changed during packaging; refusing to publish APK.' >&2
     exit 1
-fi
+}
 mapfile -d '' -t unaligned_apks < <(python3 - "$CARGO_TARGET_DIR" <<'PY'
 import pathlib
 import sys
@@ -107,7 +107,7 @@ cp -- "$work_dir/signed.apk" dist/relay-price-calc-m-arm64-test.apk
     printf '%s\n' 'Slint 1.14.1 Android NativeActivity backend uses Skia, not renderer-software.'
     printf '%s\n' 'ELF/ZIP 16KB checks passed; real 16KB-device, IME, Chinese-font and inset testing is still required.'
     rustc --version
-    cargo apk --version
+    cargo apk version
     printf 'Source commit: %s\n' "${GITHUB_SHA:-not-recorded}"
 } > dist/BUILD-INFO.txt
 ( cd dist && sha256sum relay-price-calc-m-arm64-test.apk > SHA256SUMS )
