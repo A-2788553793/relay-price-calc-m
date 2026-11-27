@@ -1,6 +1,6 @@
 [package]
 name = "relay-price-calc-m"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.90"
 description = "Rust + Slint Android 中转站模型价格比较工具"
@@ -18,12 +18,17 @@ required-features = ["ui"]
 
 [features]
 default = []
-ui = ["dep:slint", "dep:slint-build"]
+ui = ["dep:slint", "dep:slint-build", "dep:jni"]
+
+[dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.154"
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
 slint = { version = "=1.14.1", optional = true, default-features = false, features = ["std", "compat-1-2", "backend-winit-x11", "renderer-software"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
+jni = { version = "=0.21.1", optional = true }
 slint = { version = "=1.14.1", optional = true, default-features = false, features = ["std", "compat-1-2", "backend-android-activity-06"] }
 
 [build-dependencies]

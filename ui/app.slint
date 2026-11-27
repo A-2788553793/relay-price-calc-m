@@ -1,8 +1,9 @@
-import { LineEdit, Button, ScrollView, AboutSlint, Palette } from "std-widgets.slint";
+import { LineEdit, ScrollView, AboutSlint, Palette } from "std-widgets.slint";
 import "../assets/fonts/NotoSansCJKsc-Regular.otf";
 
 export global Theme {
     in-out property <bool> dark: false;
+    in-out property <float> scale: 1;
     changed dark => { Palette.color-scheme = dark ? ColorScheme.dark : ColorScheme.light; }
     out property <color> background: dark ? #141c28 : #f3f6fa;
     out property <color> surface: dark ? #1e2938 : #ffffff;
@@ -14,11 +15,48 @@ export global Theme {
     out property <color> error: dark ? #ffb4b4 : #a7202c;
 }
 
-export struct PriceField {
-    label: string,
-    value: string,
-    error: string,
-    unit: string,
+export struct PriceField { label: string, value: string, error: string, unit: string }
+export struct ModelCard { name: string, fields: [PriceField], coefficient: string, error: string, best: bool }
+export struct RankingRow { name: string, place: string, coefficient: string, saving: string, best: bool }
+
+// A predictable mobile touch target; unlike native-style Button internals,
+// every label follows the same user-selected scale.
+component ActionButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    callback clicked();
+    min-height: max(44px, 44px * Theme.scale);
+    min-width: 44px;
+    vertical-stretch: 0;
+    background: touch.pressed && root.enabled ? Theme.result-bg : Theme.surface;
+    border-width: focus.has-focus ? 2px : 1px;
+    border-color: focus.has-focus ? Theme.accent : Theme.border;
+    border-radius: 8px;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+    forward-focus: focus;
+    HorizontalLayout {
+        padding: 8px;
+        Text { text: root.text; color: root.enabled ? Theme.text : Theme.muted; font-size: 14px * Theme.scale; wrap: word-wrap; horizontal-alignment: center; vertical-alignment: center; }
+    }
+    touch := TouchArea { enabled: root.enabled; clicked => { focus.focus(); root.clicked(); } }
+    focus := FocusScope {
+        x: 0px; width: 0px; // Match the official Button: do not intercept pointer clicks.
+        enabled: root.enabled;
+        key-pressed(event) => {
+            if event.text == " " || event.text == "\n" { root.clicked(); return accept; }
+            return reject;
+        }
+    }
+}
+
+component CopyText inherits Text {
+    color: Theme.muted;
+    font-size: 12px * Theme.scale;
+    wrap: word-wrap;
+    vertical-stretch: 0;
 }
 
 component PriceRow inherits VerticalLayout {
@@ -26,104 +64,81 @@ component PriceRow inherits VerticalLayout {
     in property <string> error;
     in property <string> unit;
     in-out property <string> value;
+    out property <length> input-y: input.absolute-position.y + input.height / 2;
     callback edited(string);
     spacing: 4px;
-    HorizontalLayout {
-        spacing: 12px;
-        Text {
-            text: root.label;
-            width: 92px;
-            color: Theme.text;
-            font-size: 14px;
-            vertical-alignment: center;
-        }
-        Rectangle {
-            height: 48px;
-            border-color: root.error != "" ? Theme.error : Theme.border;
-            border-width: root.error != "" ? 2px : 1px;
-            border-radius: 8px;
-            background: Theme.surface;
-            input := LineEdit {
-                x: 2px; y: 2px;
-                width: parent.width - 4px;
-                height: parent.height - 4px;
-                text <=> root.value;
-                placeholder-text: root.unit == "%" ? "0 ~ 100" : "0";
-                input-type: decimal;
-                edited(text) => { root.edited(text); }
-            }
-        }
-        Text {
-            text: root.unit;
-            width: 16px;
-            color: Theme.muted;
-            font-size: 14px;
-            vertical-alignment: center;
+    Text { text: root.label + (root.unit == "" ? "" : "（" + root.unit + "）"); color: Theme.text; font-size: 14px * Theme.scale; wrap: word-wrap; }
+    Rectangle {
+        height: 48px * Theme.scale;
+        border-color: root.error != "" ? Theme.error : Theme.border;
+        border-width: root.error != "" ? 2px : 1px;
+        border-radius: 8px;
+        background: Theme.surface;
+        input := LineEdit {
+            x: 2px; y: 2px;
+            width: parent.width - 4px; height: parent.height - 4px;
+            min-width: 0px;
+            font-size: 14px * Theme.scale;
+            text <=> root.value;
+            placeholder-text: root.unit == "%" ? "0 ~ 100" : "0";
+            input-type: decimal;
+            edited(text) => { root.edited(text); }
         }
     }
-    Text {
-        text: root.error;
-        height: 18px;
-        color: Theme.error;
-        font-size: 12px;
-        horizontal-alignment: right;
-    }
+    Text { text: root.error; min-height: 16px * Theme.scale; color: Theme.error; font-size: 12px * Theme.scale; wrap: word-wrap; }
 }
 
 component ModelPanel inherits Rectangle {
-    in property <string> title;
-    in property <[PriceField]> fields;
-    in property <string> coefficient;
-    in property <string> error;
+    in property <ModelCard> model;
+    in property <int> number;
+    out property <length> name-y: name-input.absolute-position.y + name-input.height / 2;
+    out property <string> name-text: name-input.text;
+    changed model => { if name-input.text != root.model.name { name-input.text = root.model.name; } }
+    out property <length> field-y: first-field.input-y;
+    out property <length> clear-x: clear-button.absolute-position.x + clear-button.width / 2;
+    out property <length> clear-y: clear-button.absolute-position.y + clear-button.height / 2;
     callback edited(int, string);
+    callback renamed(string);
+    callback cleared();
     background: Theme.surface;
-    border-color: Theme.border;
-    border-width: 1px;
+    border-color: root.model.best ? Theme.accent : Theme.border;
+    border-width: root.model.best ? 2px : 1px;
     border-radius: 12px;
     VerticalLayout {
-        padding: 16px;
+        padding: 12px;
         spacing: 8px;
         HorizontalLayout {
-            Text {
-                text: root.title;
-                color: Theme.text;
-                font-size: 20px;
-                font-weight: 700;
-            }
-            Text {
-                text: "每百万 token 单价";
-                color: Theme.muted;
-                font-size: 12px;
-                horizontal-alignment: right;
-                vertical-alignment: center;
-            }
+            spacing: 8px;
+            Text { text: "模型 " + root.number; color: Theme.accent; font-size: 16px * Theme.scale; font-weight: 700; vertical-alignment: center; }
+            clear-button := ActionButton { text: "清除此项"; clicked => { root.cleared(); } }
         }
-        for field[index] in root.fields: PriceRow {
-            label: field.label;
-            value: field.value;
-            error: field.error;
-            unit: field.unit;
+        // Always show the entire name; LineEdit itself scrolls horizontally while editing.
+        Text { text: root.model.name; color: Theme.text; font-size: 18px * Theme.scale; font-weight: 700; wrap: word-wrap; }
+        name-input := LineEdit {
+            height: 48px * Theme.scale;
+            min-width: 0px;
+            font-size: 14px * Theme.scale;
+            text: root.model.name;
+            placeholder-text: "模型名称";
+            edited(text) => { root.renamed(text); name-input.text = root.model.name; }
+        }
+        CopyText { text: "每百万 token 单价 · 相同货币与单位"; }
+        first-field := PriceRow {
+            label: root.model.fields[0].label;
+            value: root.model.fields[0].value;
+            error: root.model.fields[0].error;
+            unit: root.model.fields[0].unit;
+            edited(text) => { root.edited(0, text); }
+        }
+        for index in [1, 2, 3, 4]: PriceRow {
+            label: root.model.fields[index].label; value: root.model.fields[index].value;
+            error: root.model.fields[index].error; unit: root.model.fields[index].unit;
             edited(text) => { root.edited(index, text); }
         }
         Rectangle { height: 1px; background: Theme.border; }
-        HorizontalLayout {
-            Text { text: "价格系数"; color: Theme.muted; font-size: 14px; vertical-alignment: center; }
-            Text {
-                text: root.coefficient;
-                color: Theme.accent;
-                font-size: 24px;
-                font-weight: 700;
-                horizontal-alignment: right;
-                overflow: elide;
-            }
-        }
-        Text {
-            text: root.error;
-            color: Theme.error;
-            font-size: 12px;
-            height: 18px;
-            overflow: elide;
-        }
+        CopyText { text: root.model.best ? "价格系数 · 当前最低" : "价格系数"; }
+        Text { text: root.model.coefficient; color: Theme.accent; font-size: 24px * Theme.scale; font-weight: 700; wrap: word-wrap; }
+        Text { text: root.model.error; min-height: 16px * Theme.scale; color: Theme.error; font-size: 12px * Theme.scale; wrap: word-wrap; }
     }
 }
 
@@ -134,75 +149,78 @@ export component MainWindow inherits Window {
     min-width: 300px;
     min-height: 300px;
     background: Theme.background;
-    default-font-size: 14px;
+    default-font-size: root.text-size * 1px;
     default-font-family: "Noto Sans CJK SC";
     full-screen: false;
+    in property <[ModelCard]> models;
+    in property <[RankingRow]> ranking;
+    in property <string> headline;
+    in property <string> detail;
+    in property <string> storage-status;
+    in property <int> winner;
     in-out property <bool> show-about: false;
+    in-out property <bool> show-settings: false;
+    in-out property <bool> dark-mode: false;
+    in-out property <int> text-size: 14;
+    changed dark-mode => { Theme.dark = root.dark-mode; }
+    changed text-size => { Theme.scale = root.text-size / 14.0; }
+    init => { Theme.dark = root.dark-mode; Theme.scale = root.text-size / 14.0; }
+    callback field-edited(int, int, string);
+    callback name-edited(int, string);
+    callback clear-model-requested(int);
+    callback clear-requested();
+    callback settings-edited(bool, int);
+    callback open-project-requested();
     out property <length> content-offset: content-scroll.viewport-y;
     out property <length> content-height: content-scroll.viewport-height;
     out property <length> content-visible-height: content-scroll.visible-height;
-    in property <[PriceField]> model-one;
-    in property <[PriceField]> model-two;
-    in property <string> coefficient-one: "0";
-    in property <string> coefficient-two: "0";
-    in property <string> error-one;
-    in property <string> error-two;
-    in property <string> headline: "两个模型一样贵";
-    in property <string> detail: "价格系数相同";
-    in property <int> winner: 0;
-    callback field-edited(int, int, string);
-    callback clear-requested();
+    out property <length> settings-offset: settings-scroll.viewport-y;
+    out property <length> settings-height: settings-scroll.viewport-height;
+    out property <length> settings-visible-height: settings-scroll.visible-height;
+    out property <length> about-offset: about-scroll.viewport-y;
+    out property <length> about-height: about-scroll.viewport-height;
+    out property <length> about-visible-height: about-scroll.visible-height;
+    // Real item coordinates let tests hit controls instead of guessing text heights.
+    out property <length> settings-button-x: settings-button.absolute-position.x + settings-button.width / 2;
+    out property <length> settings-button-y: settings-button.absolute-position.y + settings-button.height / 2;
+    out property <length> settings-button-width: settings-button.width;
+    out property <length> settings-button-height: settings-button.height;
+    out property <length> about-button-x: about-button.absolute-position.x + about-button.width / 2;
+    out property <length> about-button-y: about-button.absolute-position.y + about-button.height / 2;
+    out property <length> about-button-width: about-button.width;
+    out property <length> about-button-height: about-button.height;
+    out property <length> clear-all-button-x: clear-all-button.absolute-position.x + clear-all-button.width / 2;
+    out property <length> clear-all-button-y: clear-all-button.absolute-position.y + clear-all-button.height / 2;
+    out property <length> clear-all-button-width: clear-all-button.width;
+    out property <length> clear-all-button-height: clear-all-button.height;
+    out property <length> settings-close-button-x: settings-close-button.absolute-position.x + settings-close-button.width / 2;
+    out property <length> settings-close-button-y: settings-close-button.absolute-position.y + settings-close-button.height / 2;
+    out property <length> settings-close-button-width: settings-close-button.width;
+    out property <length> settings-close-button-height: settings-close-button.height;
+    out property <length> about-close-button-x: about-close-button.absolute-position.x + about-close-button.width / 2;
+    out property <length> about-close-button-y: about-close-button.absolute-position.y + about-close-button.height / 2;
+    out property <length> about-close-button-width: about-close-button.width;
+    out property <length> about-close-button-height: about-close-button.height;
+    out property <length> first-name-y: first-card.name-y;
+    out property <string> first-name-text: first-card.name-text;
+    out property <length> first-field-y: first-card.field-y;
+    out property <length> first-clear-x: first-card.clear-x;
+    out property <length> first-clear-y: first-card.clear-y;
+    out property <length> scroll-top: content-scroll.absolute-position.y;
+    out property <length> theme-button-y: theme-button.absolute-position.y + theme-button.height / 2;
+    out property <length> larger-button-y: larger-button.absolute-position.y + larger-button.height / 2;
+    out property <length> larger-button-x: larger-button.absolute-position.x + larger-button.width / 2;
+    out property <length> project-button-y: project-button.absolute-position.y + project-button.height / 2;
 
     VerticalLayout {
-        padding: 16px;
-        spacing: 12px;
+        padding: 12px;
+        spacing: 8px;
+        Text { text: "模型价格对比"; color: Theme.text; font-size: 20px * Theme.scale; font-weight: 700; }
         HorizontalLayout {
             spacing: 8px;
-            Text {
-                text: "模型价格对比";
-                color: Theme.text;
-                font-size: 20px;
-                font-weight: 700;
-                vertical-alignment: center;
-            }
-            Button {
-                text: "关于";
-                min-height: 44px;
-                max-width: 64px;
-                clicked => { root.show-about = true; }
-            }
-        }
-        HorizontalLayout {
-            spacing: 8px;
-            Button {
-                text: Theme.dark ? "浅色" : "深色";
-                min-height: 44px;
-                max-width: 64px;
-                clicked => { Theme.dark = !Theme.dark; }
-            }
-            Button {
-                text: "清空";
-                min-height: 44px;
-                max-width: 64px;
-                clicked => { root.clear-requested(); }
-            }
-        }
-        Rectangle {
-            height: 88px;
-            background: Theme.result-bg;
-            border-radius: 12px;
-            VerticalLayout {
-                padding: 12px;
-                spacing: 4px;
-                Text {
-                    text: root.headline;
-                    color: root.winner < 0 ? Theme.error : Theme.accent;
-                    font-size: 24px;
-                    font-weight: 700;
-                    vertical-alignment: center;
-                }
-                Text { text: root.detail; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
-            }
+            settings-button := ActionButton { text: "设置"; clicked => { root.show-settings = true; root.show-about = false; } }
+            about-button := ActionButton { text: "关于"; clicked => { root.show-about = true; root.show-settings = false; } }
+            clear-all-button := ActionButton { text: "全部清空"; clicked => { root.clear-requested(); } }
         }
         content-scroll := ScrollView {
             viewport-width: self.visible-width;
@@ -210,52 +228,101 @@ export component MainWindow inherits Window {
             VerticalLayout {
                 spacing: 12px;
                 padding-right: 4px;
-                Text {
-                    text: "价格需使用相同货币与单位。空白按 0 计算，输入后实时比较。";
-                    color: Theme.muted;
-                    font-size: 12px;
-                    wrap: word-wrap;
+                Rectangle {
+                    background: Theme.result-bg;
+                    border-radius: 12px;
+                    VerticalLayout {
+                        padding: 12px; spacing: 8px;
+                        Text { text: root.headline; color: root.winner < 0 ? Theme.error : Theme.accent; font-size: 20px * Theme.scale; font-weight: 700; wrap: word-wrap; }
+                        CopyText { text: root.detail; }
+                    }
                 }
-                ModelPanel {
-                    title: "模型1";
-                    fields: root.model-one;
-                    coefficient: root.coefficient-one;
-                    error: root.error-one;
-                    edited(index, text) => { root.field-edited(0, index, text); }
+                CopyText { text: "已填写模型实时比较 · 空白字段按 0 计算\n" + root.storage-status; }
+                first-card := ModelPanel {
+                    model: root.models[0]; number: 1;
+                    edited(field, text) => { root.field-edited(0, field, text); }
+                    renamed(text) => { root.name-edited(0, text); }
+                    cleared => { root.clear-model-requested(0); }
                 }
-                ModelPanel {
-                    title: "模型2";
-                    fields: root.model-two;
-                    coefficient: root.coefficient-two;
-                    error: root.error-two;
-                    edited(index, text) => { root.field-edited(1, index, text); }
+                for index in [1, 2, 3]: ModelPanel {
+                    model: root.models[index]; number: index + 1;
+                    edited(field, text) => { root.field-edited(index, field, text); }
+                    renamed(text) => { root.name-edited(index, text); }
+                    cleared => { root.clear-model-requested(index); }
                 }
-                Text {
-                    text: "计算规则\n价格系数 = (输入 + 输出) × (1 − 缓存率) + (缓存读取 + 缓存写入) × 缓存率\n\n缓存率按百分比填写。系数沿用原项目公式，不代表一次真实请求的账单。\n\nBuilt with Slint · slint.dev\nrelay-price-calc-m · 离线计算 · 不申请联网权限";
-                    color: Theme.muted;
-                    font-size: 12px;
-                    wrap: word-wrap;
+                Text { text: "价格排名"; color: Theme.text; font-size: 20px * Theme.scale; font-weight: 700; }
+                for row in root.ranking: Rectangle {
+                    border-radius: 8px; background: row.best ? Theme.result-bg : Theme.surface;
+                    VerticalLayout {
+                        padding: 12px; spacing: 4px;
+                        Text { text: row.place + " · " + row.name; color: row.best ? Theme.accent : Theme.text; font-size: 16px * Theme.scale; font-weight: 700; wrap: word-wrap; }
+                        Text { text: "价格系数 " + row.coefficient; color: Theme.text; font-size: 14px * Theme.scale; wrap: word-wrap; }
+                        CopyText { text: row.saving; }
+                    }
+                }
+                CopyText { text: "计算规则\n价格系数 = (输入 + 输出) × (1 − 缓存率) + (缓存读取 + 缓存写入) × 缓存率\n\n缓存率按百分比填写。系数沿用原项目公式，不代表一次真实请求的账单。\n\nBuilt with Slint · slint.dev\nrelay-price-calc-m · 离线计算 · 不申请联网权限"; }
+            }
+        }
+    }
+    // Keep each scroll view instantiated so its measurements are available to tests.
+    settings-page := Rectangle {
+        visible: root.show-settings;
+        background: Theme.background;
+        VerticalLayout {
+            padding: 12px; spacing: 12px;
+            HorizontalLayout {
+                Text { text: "设置"; color: Theme.text; font-size: 22px * Theme.scale; font-weight: 700; }
+                settings-close-button := ActionButton { text: "关闭"; clicked => { root.show-settings = false; } }
+            }
+            settings-scroll := ScrollView {
+                viewport-width: self.visible-width;
+                mouse-drag-pan-enabled: true;
+                VerticalLayout {
+                    alignment: start; padding-right: 4px; spacing: 16px;
+                    Text { text: "外观"; color: Theme.text; font-size: 18px * Theme.scale; font-weight: 700; }
+                    theme-button := ActionButton {
+                        text: root.dark-mode ? "切换为浅色" : "切换为深色";
+                        clicked => { root.dark-mode = !root.dark-mode; root.settings-edited(root.dark-mode, root.text-size); }
+                    }
+                    Text { text: "字号：" + root.text-size; color: Theme.text; font-size: 18px * Theme.scale; }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        ActionButton {
+                            text: "减小"; enabled: root.text-size > 12;
+                            clicked => { root.text-size = max(12, root.text-size - 1); root.settings-edited(root.dark-mode, root.text-size); }
+                        }
+                        larger-button := ActionButton {
+                            text: "增大"; enabled: root.text-size < 20;
+                            clicked => { root.text-size = min(20, root.text-size + 1); root.settings-edited(root.dark-mode, root.text-size); }
+                        }
+                    }
+                    CopyText { text: "字号范围为 12 至 20，默认 14。所有模型卡片、排名和说明会一起缩放，字体继续使用内嵌 Noto Sans CJK SC。"; }
+                    Text { text: "离线保存"; color: Theme.text; font-size: 18px * Theme.scale; font-weight: 700; }
+                    CopyText { text: root.storage-status; }
+                    CopyText { text: "模型名称、价格输入、主题与字号自动保存在本应用私有目录中，仅在本机使用，不上传服务器。\n\n退出后重新打开可恢复内容；全部清空会重置模型输入。卸载应用或在系统设置中清除应用数据会删除保存内容。\n\n应用不申请联网权限。打开项目主页由系统浏览器处理。"; }
                 }
             }
         }
     }
-    if root.show-about: Rectangle {
+    about-page := Rectangle {
+        visible: root.show-about;
         background: Theme.background;
         VerticalLayout {
-            padding: 20px;
-            spacing: 16px;
+            padding: 12px; spacing: 12px;
             HorizontalLayout {
-                Text { text: "关于"; font-size: 22px; font-weight: 700; color: Theme.text; }
-                Button { text: "关闭"; min-height: 44px; clicked => { root.show-about = false; } }
+                Text { text: "关于"; color: Theme.text; font-size: 22px * Theme.scale; font-weight: 700; }
+                about-close-button := ActionButton { text: "关闭"; clicked => { root.show-about = false; } }
             }
-            ScrollView {
+            about-scroll := ScrollView {
                 viewport-width: self.visible-width;
                 mouse-drag-pan-enabled: true;
                 VerticalLayout {
-                    alignment: start;
-                    spacing: 20px;
-                    Text { text: "relay-price-calc-m 0.1.2\nRust + Slint · Android 版\n\n基于 A-2788553793/relay-price-calc\n应用源码：MIT License\n\n纯离线计算，不收集数据。\n关闭应用后不保留输入。"; color: Theme.text; wrap: word-wrap; vertical-stretch: 0; }
-                    AboutSlint { preferred-height: 160px; max-height: 160px; }
+                    alignment: start; padding-right: 4px; spacing: 16px;
+                    Text { text: "relay-price-calc-m 0.2.0\nRust + Slint · Android 版"; color: Theme.text; font-size: 18px * Theme.scale; font-weight: 700; wrap: word-wrap; }
+                    CopyText { text: "四模型价格比较 · 应用源码 MIT License\n\n项目主页\nhttps://github.com/A-2788553793/relay-price-calc-m\n\n基于上游项目\nhttps://github.com/A-2788553793/relay-price-calc"; }
+                    project-button := ActionButton { text: "在浏览器打开项目主页"; clicked => { root.open-project-requested(); } }
+                    CopyText { text: "纯离线计算，不收集数据，不申请联网权限。模型输入与外观设置自动保存在应用私有目录，卸载应用或清除应用数据会删除它们。\n\n内嵌 Noto Sans CJK SC 字体（SIL Open Font License）。\n\nBuilt with Slint"; }
+                    AboutSlint { preferred-height: 190px * Theme.scale; min-height: 190px * Theme.scale; }
                 }
             }
         }

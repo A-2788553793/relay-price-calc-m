@@ -66,6 +66,48 @@ pub fn compare(c1: f64, c2: f64) -> Verdict {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Ranked {
+    pub index: usize,
+    pub coefficient: f64,
+}
+
+/// 跳过缺失项；先按精确数值排序，再恢复每个容差组内的原始顺序。
+/// 近似相等不具传递性，因此每组始终以其最小值为基准。
+pub fn rank(coefficients: &[Option<f64>]) -> Vec<Ranked> {
+    let mut ranked: Vec<_> = coefficients
+        .iter()
+        .enumerate()
+        .filter_map(|(index, &coefficient)| {
+            coefficient.map(|coefficient| Ranked { index, coefficient })
+        })
+        .collect();
+    ranked.sort_by(|a, b| a.coefficient.total_cmp(&b.coefficient));
+    let mut start = 0;
+    while start < ranked.len() {
+        let mut end = start + 1;
+        while end < ranked.len() && is_equal(ranked[start].coefficient, ranked[end].coefficient) {
+            end += 1;
+        }
+        ranked[start..end].sort_by_key(|entry| entry.index);
+        start = end;
+    }
+    ranked
+}
+
+pub fn is_equal(a: f64, b: f64) -> bool {
+    compare(a, b) == Verdict::Equal
+}
+
+/// 以较贵模型为基准计算节省百分比，避免零系数作为分母。
+pub fn saving_percent(cheap: f64, dear: f64) -> f64 {
+    if dear <= 0.0 {
+        0.0
+    } else {
+        (dear - cheap) / dear * 100.0
+    }
+}
+
 /// 与原项目一致：空白按 0；支持全角数字、句号和末尾的百分号。
 pub fn parse_number(text: &str) -> Result<f64, String> {
     let normalized: String = text
