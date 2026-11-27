@@ -1,0 +1,5 @@
+/target/
+/dist/
+*.keystore
+*.jks
+.local/

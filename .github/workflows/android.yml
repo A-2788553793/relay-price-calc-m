@@ -1,0 +1,107 @@
+name: Android APK (test signed)
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+      # An isolated SDK prevents cargo-apk from selecting a newer preinstalled
+      # build-tools/platform version from the hosted runner's shared SDK.
+      ANDROID_HOME: ${{ runner.temp }}/relay-price-calc-m-android-sdk
+      ANDROID_SDK_ROOT: ${{ runner.temp }}/relay-price-calc-m-android-sdk
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Linux desktop-check and Skia fallback dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            build-essential pkg-config clang cmake ninja-build python3 curl \
+            libfontconfig1-dev libfreetype6-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libx11-xcb-dev libxcb-render0-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev libxcb-xkb-dev \
+            libgl1-mesa-dev libegl1-mesa-dev
+
+      - name: Set up pinned Android SDK and NDK
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '12266719'
+          accept-android-sdk-licenses: true
+          log-accepted-android-sdk-licenses: false
+          packages: 'platform-tools platforms;android-34 build-tools;35.0.0 ndk;28.2.13676358'
+
+      - name: Export both NDK variables
+        run: |
+          ndk="$ANDROID_HOME/ndk/28.2.13676358"
+          printf 'ANDROID_NDK_ROOT=%s\n' "$ndk" >> "$GITHUB_ENV"
+          printf 'ANDROID_NDK=%s\n' "$ndk" >> "$GITHUB_ENV"
+          printf 'ANDROID_NDK_HOME=%s\n' "$ndk" >> "$GITHUB_ENV"
+
+      - name: Set up Rust 1.90.0
+        run: |
+          rustup toolchain install 1.90.0 --profile minimal \
+            --component rustfmt --component clippy --target aarch64-linux-android
+          rustc --version
+          cargo --version
+
+      - name: Check formatting, core tests and lint
+        run: |
+          bash -n scripts/build-android.sh
+          PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_verify_apk.py -v
+          cargo fmt --all -- --check
+          cargo test --locked --no-default-features
+          cargo clippy --locked --no-default-features --all-targets -- -D warnings
+
+      - name: Test and lint desktop Slint UI
+        run: |
+          cargo test --locked --features ui
+          cargo clippy --locked --all-targets --features ui -- -D warnings
+
+      - name: Install cargo-apk 0.10.0
+        run: cargo install --locked cargo-apk --version 0.10.0
+
+      - name: Build and verify test-signed arm64 APK
+        run: bash scripts/build-android.sh
+
+      - name: Upload APK, checksum and legal notices
+        uses: actions/upload-artifact@v4
+        with:
+          name: relay-price-calc-m-arm64-test-apk
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            dist/*.apk
+            dist/SHA256SUMS
+            dist/BUILD-INFO.txt
+            dist/legal/
+
+      # No PR execution, write token, secrets, keystore upload, push or release.
+      # Every run creates a new TEST certificate: uninstall a previous build
+      # before installing another run's APK; uninstalling clears local app data.

@@ -1,0 +1,256 @@
+import { LineEdit, Button, ScrollView, AboutSlint, Palette } from "std-widgets.slint";
+
+export global Theme {
+    in-out property <bool> dark: false;
+    changed dark => { Palette.color-scheme = dark ? ColorScheme.dark : ColorScheme.light; }
+    out property <color> background: dark ? #141c28 : #f3f6fa;
+    out property <color> surface: dark ? #1e2938 : #ffffff;
+    out property <color> text: dark ? #edf2fa : #182437;
+    out property <color> muted: dark ? #b4c3d7 : #52647c;
+    out property <color> border: dark ? #43546b : #d1dbe8;
+    out property <color> accent: dark ? #a3c8ff : #245dad;
+    out property <color> result-bg: dark ? #21364f : #e8f0fd;
+    out property <color> error: dark ? #ffb4b4 : #a7202c;
+}
+
+export struct PriceField {
+    label: string,
+    value: string,
+    error: string,
+    unit: string,
+}
+
+component PriceRow inherits VerticalLayout {
+    in property <string> label;
+    in property <string> error;
+    in property <string> unit;
+    in-out property <string> value;
+    callback edited(string);
+    spacing: 4px;
+    HorizontalLayout {
+        spacing: 12px;
+        Text {
+            text: root.label;
+            width: 92px;
+            color: Theme.text;
+            font-size: 14px;
+            vertical-alignment: center;
+        }
+        Rectangle {
+            height: 48px;
+            border-color: root.error != "" ? Theme.error : Theme.border;
+            border-width: root.error != "" ? 2px : 1px;
+            border-radius: 8px;
+            background: Theme.surface;
+            input := LineEdit {
+                x: 2px; y: 2px;
+                width: parent.width - 4px;
+                height: parent.height - 4px;
+                text <=> root.value;
+                placeholder-text: root.unit == "%" ? "0 ~ 100" : "0";
+                input-type: decimal;
+                edited(text) => { root.edited(text); }
+            }
+        }
+        Text {
+            text: root.unit;
+            width: 16px;
+            color: Theme.muted;
+            font-size: 14px;
+            vertical-alignment: center;
+        }
+    }
+    Text {
+        text: root.error;
+        height: 18px;
+        color: Theme.error;
+        font-size: 12px;
+        horizontal-alignment: right;
+    }
+}
+
+component ModelPanel inherits Rectangle {
+    in property <string> title;
+    in property <[PriceField]> fields;
+    in property <string> coefficient;
+    in property <string> error;
+    callback edited(int, string);
+    background: Theme.surface;
+    border-color: Theme.border;
+    border-width: 1px;
+    border-radius: 12px;
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+        HorizontalLayout {
+            Text {
+                text: root.title;
+                color: Theme.text;
+                font-size: 20px;
+                font-weight: 700;
+            }
+            Text {
+                text: "每百万 token 单价";
+                color: Theme.muted;
+                font-size: 12px;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+            }
+        }
+        for field[index] in root.fields: PriceRow {
+            label: field.label;
+            value: field.value;
+            error: field.error;
+            unit: field.unit;
+            edited(text) => { root.edited(index, text); }
+        }
+        Rectangle { height: 1px; background: Theme.border; }
+        HorizontalLayout {
+            Text { text: "价格系数"; color: Theme.muted; font-size: 14px; vertical-alignment: center; }
+            Text {
+                text: root.coefficient;
+                color: Theme.accent;
+                font-size: 24px;
+                font-weight: 700;
+                horizontal-alignment: right;
+                overflow: elide;
+            }
+        }
+        Text {
+            text: root.error;
+            color: Theme.error;
+            font-size: 12px;
+            height: 18px;
+            overflow: elide;
+        }
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "relay-price-calc-m";
+    preferred-width: 390px;
+    preferred-height: 844px;
+    min-width: 300px;
+    min-height: 300px;
+    background: Theme.background;
+    default-font-size: 14px;
+    full-screen: false;
+    in-out property <bool> show-about: false;
+    in property <[PriceField]> model-one;
+    in property <[PriceField]> model-two;
+    in property <string> coefficient-one: "0";
+    in property <string> coefficient-two: "0";
+    in property <string> error-one;
+    in property <string> error-two;
+    in property <string> headline: "两个模型一样贵";
+    in property <string> detail: "价格系数相同";
+    in property <int> winner: 0;
+    callback field-edited(int, int, string);
+    callback clear-requested();
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+        HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: "模型价格对比";
+                color: Theme.text;
+                font-size: 20px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+            Button {
+                text: "关于";
+                min-height: 44px;
+                max-width: 64px;
+                clicked => { root.show-about = true; }
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            Button {
+                text: Theme.dark ? "浅色" : "深色";
+                min-height: 44px;
+                max-width: 64px;
+                clicked => { Theme.dark = !Theme.dark; }
+            }
+            Button {
+                text: "清空";
+                min-height: 44px;
+                max-width: 64px;
+                clicked => { root.clear-requested(); }
+            }
+        }
+        Rectangle {
+            height: 88px;
+            background: Theme.result-bg;
+            border-radius: 12px;
+            VerticalLayout {
+                padding: 12px;
+                spacing: 4px;
+                Text {
+                    text: root.headline;
+                    color: root.winner < 0 ? Theme.error : Theme.accent;
+                    font-size: 24px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+                Text { text: root.detail; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+            }
+        }
+        ScrollView {
+            viewport-width: self.visible-width;
+            VerticalLayout {
+                spacing: 12px;
+                padding-right: 4px;
+                Text {
+                    text: "价格需使用相同货币与单位。空白按 0 计算，输入后实时比较。";
+                    color: Theme.muted;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+                ModelPanel {
+                    title: "模型1";
+                    fields: root.model-one;
+                    coefficient: root.coefficient-one;
+                    error: root.error-one;
+                    edited(index, text) => { root.field-edited(0, index, text); }
+                }
+                ModelPanel {
+                    title: "模型2";
+                    fields: root.model-two;
+                    coefficient: root.coefficient-two;
+                    error: root.error-two;
+                    edited(index, text) => { root.field-edited(1, index, text); }
+                }
+                Text {
+                    text: "计算规则\n价格系数 = (输入 + 缓存写入) × (1 − 缓存率) + 缓存读取 × 缓存率 + 输出\n\n缓存率按百分比填写。系数沿用原项目公式，不代表一次真实请求的账单。\n\nBuilt with Slint · slint.dev\nrelay-price-calc-m · 离线计算 · 不申请联网权限";
+                    color: Theme.muted;
+                    font-size: 12px;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+    if root.show-about: Rectangle {
+        background: Theme.background;
+        VerticalLayout {
+            padding: 20px;
+            spacing: 16px;
+            HorizontalLayout {
+                Text { text: "关于"; font-size: 22px; font-weight: 700; color: Theme.text; }
+                Button { text: "关闭"; min-height: 44px; clicked => { root.show-about = false; } }
+            }
+            ScrollView {
+                viewport-width: self.visible-width;
+                VerticalLayout {
+                    alignment: start;
+                    spacing: 20px;
+                    Text { text: "relay-price-calc-m 0.1.0\nRust + Slint · Android 版\n\n基于 A-2788553793/relay-price-calc\n应用源码：MIT License\n\n纯离线计算，不收集数据。\n关闭应用后不保留输入。"; color: Theme.text; wrap: word-wrap; vertical-stretch: 0; }
+                    AboutSlint { preferred-height: 160px; max-height: 160px; }
+                }
+            }
+        }
+    }
+}
