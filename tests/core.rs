@@ -35,27 +35,50 @@ fn assert_close(actual: f64, expected: f64) {
 }
 
 #[test]
-fn original_readme_example_has_coefficient_16_59() {
-    // (3 + 3.75) * 20% + 0.3 * 80% + 15 = 16.59.
+fn upstream_updated_example_has_coefficient_6_84() {
+    // (3 + 15) * 20% + (0.3 + 3.75) * 80% = 6.84.
     let example = prices([3.0, 15.0, 3.75, 0.3, 80.0]);
     assert_eq!(example.validate(), Ok(()));
-    assert_close(example.coefficient().unwrap(), 16.59);
-    assert_eq!(format_coefficient(example.coefficient().unwrap()), "16.59");
+    assert_close(example.coefficient().unwrap(), 6.84);
+    assert_eq!(format_coefficient(example.coefficient().unwrap()), "6.84");
     assert_close(
         input(["3", "15", "3.75", "0.3", "80"])
             .coefficient()
             .unwrap(),
-        16.59,
+        6.84,
     );
 }
 
 #[test]
 fn cache_rate_boundaries_and_intermediate_values_follow_the_formula() {
-    for (rate, expected) in [(0.0, 21.75), (25.0, 20.1375), (80.0, 16.59), (100.0, 15.3)] {
+    for (rate, expected) in [(0.0, 18.0), (25.0, 14.5125), (80.0, 6.84), (100.0, 4.05)] {
         let value = prices([3.0, 15.0, 3.75, 0.3, rate]);
         assert_eq!(value.validate(), Ok(()), "cache rate {rate}");
         assert_close(value.coefficient().unwrap(), expected);
     }
+}
+
+#[test]
+fn each_price_uses_the_updated_cache_weight() {
+    for (field, expected) in [(0, 8.0), (1, 8.0), (2, 2.0), (3, 2.0)] {
+        let mut values = [0.0; 5];
+        values[field] = 10.0;
+        values[4] = 20.0;
+        assert_close(prices(values).coefficient().unwrap(), expected);
+    }
+}
+
+#[test]
+fn updated_formula_changes_the_winner_against_an_output_only_model() {
+    let form = FormState {
+        models: [
+            input(["3", "15", "3.75", "0.3", "80"]),
+            input(["", "10", "", "", ""]),
+        ],
+    };
+    assert_eq!(form.coefficient_text(0), "6.84");
+    assert_eq!(form.summary().winner, 1);
+    assert!(form.summary().detail.contains("31.6%"));
 }
 
 #[test]
@@ -111,8 +134,10 @@ fn cache_rate_cannot_exceed_one_hundred_percent() {
 fn coefficient_rejects_overflow_after_validating_finite_inputs() {
     for values in [
         [f64::MAX, f64::MAX, 0.0, 0.0, 0.0],
-        [f64::MAX, 0.0, f64::MAX, 0.0, 0.0],
-        [0.0, f64::MAX, 0.0, f64::MAX, 100.0],
+        [0.0, 0.0, f64::MAX, f64::MAX, 100.0],
+        // Match upstream evaluation order: the sums overflow even at zero weight.
+        [f64::MAX, f64::MAX, 0.0, 0.0, 100.0],
+        [0.0, 0.0, f64::MAX, f64::MAX, 0.0],
         [f64::MAX, f64::MAX, f64::MAX, f64::MAX, 50.0],
     ] {
         let value = prices(values);
@@ -125,8 +150,8 @@ fn coefficient_rejects_overflow_after_validating_finite_inputs() {
 fn finite_extremes_and_inactive_cache_components_do_not_overflow() {
     for (values, expected) in [
         ([f64::MAX, 0.0, 0.0, 0.0, 0.0], f64::MAX),
-        ([f64::MAX, 1.0, f64::MAX, 2.0, 100.0], 3.0),
-        ([1.0, 3.0, 2.0, f64::MAX, 0.0], 6.0),
+        ([f64::MAX, 1.0, 2.0, 3.0, 100.0], 5.0),
+        ([1.0, 3.0, 2.0, f64::MAX, 0.0], 4.0),
     ] {
         assert_close(prices(values).coefficient().unwrap(), expected);
     }
@@ -281,7 +306,7 @@ fn model_input_normalizes_all_fields_before_calculating() {
     for field in 0..FIELDS.len() {
         assert_eq!(model.field_error(field), "");
     }
-    assert_close(model.coefficient().unwrap(), 16.59);
+    assert_close(model.coefficient().unwrap(), 6.84);
 }
 
 #[test]
@@ -374,14 +399,15 @@ fn setting_each_field_recalculates_coefficients_and_winners_immediately() {
     for (model, field, text, first, second, winner) in [
         (0, 0, "3", 3.0, 0.0, 2),
         (0, 1, "15", 18.0, 0.0, 2),
-        (0, 2, "3.75", 21.75, 0.0, 2),
-        (0, 3, "0.3", 21.75, 0.0, 2),
-        (0, 4, "80", 16.59, 0.0, 2),
-        (1, 1, "20", 16.59, 20.0, 1),
-        (1, 1, "10", 16.59, 10.0, 2),
-        (0, 4, "100", 15.3, 10.0, 2),
-        (1, 1, "15.3", 15.3, 15.3, 0),
-        (0, 1, "", 0.3, 15.3, 1),
+        (0, 2, "3.75", 18.0, 0.0, 2),
+        (0, 3, "0.3", 18.0, 0.0, 2),
+        (0, 4, "80", 6.84, 0.0, 2),
+        (1, 1, "20", 6.84, 20.0, 1),
+        (1, 1, "10", 6.84, 10.0, 1),
+        (0, 4, "100", 4.05, 10.0, 1),
+        (1, 1, "4.05", 4.05, 4.05, 0),
+        (0, 1, "", 4.05, 4.05, 0),
+        (0, 2, "", 0.3, 4.05, 1),
     ] {
         form.set(model, field, text.into());
         assert_eq!(form.models[model].values[field], text);
@@ -502,7 +528,7 @@ fn summary_uses_calculated_values_and_relative_epsilon_for_equality() {
         FormState {
             models: [
                 input(["2", "3", "", "", "0"]),
-                input(["", "5", "", "", "100"]),
+                input(["", "", "2", "3", "100"]),
             ],
         },
     ] {

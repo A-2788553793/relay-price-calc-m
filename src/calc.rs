@@ -42,12 +42,12 @@ impl Prices {
         Ok(())
     }
 
+    /// 与上游同步：非缓存价格之和乘未命中率，缓存价格之和乘命中率。
     pub fn coefficient(&self) -> Result<f64, String> {
         self.validate()?;
         let hit = self.cache_rate_percent / 100.0;
         let miss = 1.0 - hit;
-        let value =
-            self.input * miss + self.cache_write * miss + self.cache_read * hit + self.output;
+        let value = (self.input + self.output) * miss + (self.cache_read + self.cache_write) * hit;
         if !value.is_finite() {
             return Err("数值过大，无法计算".into());
         }

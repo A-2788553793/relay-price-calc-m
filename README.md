@@ -16,9 +16,9 @@
 
 沿用原项目公式，**不是实际请求账单估算器**。两个模型须使用相同货币和单位（建议每百万 token）。缓存率填 `80` 表示 80%，不是 0.8。
 
-`价格系数 = 输入 × (1 − r) + 缓存写入 × (1 − r) + 缓存读取 × r + 输出`
+`价格系数 = (输入 + 输出) × (1 − r) + (缓存读取 + 缓存写入) × r`
 
-r = 平均缓存率 / 100。示例输入 3、输出 15、缓存写入 3.75、缓存读取 0.3、缓存率 80，系数为 **16.59**。
+r = 平均缓存率 / 100。示例输入 3、输出 15、缓存写入 3.75、缓存读取 0.3、缓存率 80，系数为 **6.84**。缓存率 0% 时只计输入与输出，100% 时只计缓存读取与写入。
 
 浮点比较沿用相对容差 1e-12；普通系数至多 4 位小数，非零且小于 0.0001 时用科学计数法。胜负用原始值，因此显示系数相同仍可能有微小价差。
 
@@ -73,6 +73,7 @@ Ubuntu 依赖：build-essential pkg-config libfontconfig1-dev libfreetype6-dev l
 ```bash
 rustup target add aarch64-linux-android
 cargo install --locked cargo-apk --version 0.10.0
+python3 scripts/check-build-cli.py
 bash scripts/build-android.sh
 ```
 
@@ -85,4 +86,6 @@ Slint 使用 Royalty-free Desktop, Mobile, and Web Applications License 2.0；�
 
 ## 验证状态
 
-见 VERIFICATION.md。**源码编译/测试通过不等于 APK 已生成，也不等于 Android 真机验收通过**；云端状态以你仓库实际 Actions 日志为准。
+**v0.1.1 已同步上游新公式。新版 APK 构建与发布状态请查看本次 Actions 及 [Releases](https://github.com/A-2788553793/relay-price-calc-m/releases)。以下第 5 次构建是旧公式版本，不包含本次更新。**
+
+[历史：GitHub Actions 第 5 次构建已成功并生成 APK](https://github.com/A-2788553793/relay-price-calc-m/actions/runs/45951833346#artifacts)。登录 GitHub，在 Artifacts 下载 `relay-price-calc-m-arm64-test-apk` 并解压安装。详细证据见 VERIFICATION.md；**构建与签名检查通过不等于 Android 真机验收通过**。

@@ -225,7 +225,7 @@ export component MainWindow inherits Window {
                     edited(index, text) => { root.field-edited(1, index, text); }
                 }
                 Text {
-                    text: "计算规则\n价格系数 = (输入 + 缓存写入) × (1 − 缓存率) + 缓存读取 × 缓存率 + 输出\n\n缓存率按百分比填写。系数沿用原项目公式，不代表一次真实请求的账单。\n\nBuilt with Slint · slint.dev\nrelay-price-calc-m · 离线计算 · 不申请联网权限";
+                    text: "计算规则\n价格系数 = (输入 + 输出) × (1 − 缓存率) + (缓存读取 + 缓存写入) × 缓存率\n\n缓存率按百分比填写。系数沿用原项目公式，不代表一次真实请求的账单。\n\nBuilt with Slint · slint.dev\nrelay-price-calc-m · 离线计算 · 不申请联网权限";
                     color: Theme.muted;
                     font-size: 12px;
                     wrap: word-wrap;

@@ -50,10 +50,10 @@ fn mobile_ui_callbacks_rendering_and_resizing() {
         window.invoke_field_edited(0, index as i32, (*text).into());
     }
     window.invoke_field_edited(1, 1, "20".into());
-    assert_eq!(window.get_coefficient_one(), "16.59");
+    assert_eq!(window.get_coefficient_one(), "6.84");
     assert_eq!(window.get_coefficient_two(), "20");
     assert_eq!(window.get_winner(), 1);
-    assert!(window.get_detail().contains("17.1%"));
+    assert!(window.get_detail().contains("65.8%"));
     assert_eq!(window.get_model_one().row_count(), 5);
     assert_eq!(window.get_model_one().row_data(4).unwrap().value, "80");
     snapshot(&adapter, "light", 390, 844);
@@ -68,7 +68,7 @@ fn mobile_ui_callbacks_rendering_and_resizing() {
     assert!(!window.get_model_one().row_data(4).unwrap().error.is_empty());
     snapshot(&adapter, "invalid", 390, 844);
     window.invoke_field_edited(0, 4, "８０％".into());
-    assert_eq!(window.get_coefficient_one(), "16.59");
+    assert_eq!(window.get_coefficient_one(), "6.84");
     window.set_show_about(true);
     snapshot(&adapter, "about", 390, 844);
     window.set_show_about(false);
