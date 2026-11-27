@@ -108,11 +108,79 @@ fn mobile_ui_callbacks_rendering_and_resizing() {
     assert_eq!(window.get_coefficient_one(), "7");
     click(120.0, 94.0);
     assert_eq!(window.get_coefficient_one(), "0");
+    // Regression: a touch-style press/move/release must pan, not only a wheel.
+    let drag_at = |x: f32, from_y: f32, to_y: f32| {
+        let position = slint::LogicalPosition::new(x, from_y);
+        adapter.dispatch_event(WindowEvent::PointerPressed {
+            position,
+            button: PointerEventButton::Left,
+        });
+        for step in 1..=12 {
+            adapter.dispatch_event(WindowEvent::PointerMoved {
+                position: slint::LogicalPosition::new(
+                    x,
+                    from_y + (to_y - from_y) * step as f32 / 12.0,
+                ),
+            });
+        }
+        adapter.dispatch_event(WindowEvent::PointerReleased {
+            position: slint::LogicalPosition::new(x, to_y),
+            button: PointerEventButton::Left,
+        });
+    };
+    let drag = |from_y, to_y| drag_at(30.0, from_y, to_y);
+    assert!(window.get_content_height() > window.get_content_visible_height());
+    let before = window.get_content_offset();
+    drag(750.0, 330.0);
+    assert!(
+        window.get_content_offset() < before - 100.0,
+        "finger drag must move content"
+    );
+    for _ in 0..5 {
+        drag(750.0, 330.0);
+    }
+    let bottom = window.get_content_visible_height() - window.get_content_height();
+    assert!(
+        window.get_content_offset() <= bottom + 2.0,
+        "bottom content is reachable"
+    );
+    snapshot(&adapter, "drag-bottom", 390, 844);
+    for _ in 0..6 {
+        drag(330.0, 750.0);
+    }
+    assert!(
+        window.get_content_offset().abs() < 2.0,
+        "reverse drag reaches top"
+    );
+    snapshot(&adapter, "drag-top", 390, 844);
+    // Start a vertical gesture over an editable field, not only the left gutter.
+    drag_at(190.0, 575.0, 330.0);
+    assert!(
+        window.get_content_offset() < -100.0,
+        "input field must not trap vertical drags"
+    );
+    for _ in 0..6 {
+        drag(330.0, 750.0);
+    }
     adapter.dispatch_event(WindowEvent::PointerScrolled {
         position: slint::LogicalPosition::new(200.0, 650.0),
         delta_x: 0.0,
         delta_y: -1600.0,
     });
     snapshot(&adapter, "scrolled", 390, 844);
+    snapshot(&adapter, "keyboard-drag-start", 390, 360);
+    for _ in 0..30 {
+        drag_at(30.0, 250.0, 335.0);
+    }
+    assert!(window.get_content_offset().abs() < 2.0);
+    for _ in 0..30 {
+        drag_at(30.0, 335.0, 250.0);
+    }
+    let keyboard_bottom = window.get_content_visible_height() - window.get_content_height();
+    assert!(
+        window.get_content_offset() <= keyboard_bottom + 2.0,
+        "bottom reachable in keyboard-sized viewport"
+    );
+    snapshot(&adapter, "keyboard-drag-bottom", 390, 360);
     window.hide().unwrap();
 }

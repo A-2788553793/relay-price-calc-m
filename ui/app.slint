@@ -1,4 +1,5 @@
 import { LineEdit, Button, ScrollView, AboutSlint, Palette } from "std-widgets.slint";
+import "../assets/fonts/NotoSansCJKsc-Regular.otf";
 
 export global Theme {
     in-out property <bool> dark: false;
@@ -134,8 +135,12 @@ export component MainWindow inherits Window {
     min-height: 300px;
     background: Theme.background;
     default-font-size: 14px;
+    default-font-family: "Noto Sans CJK SC";
     full-screen: false;
     in-out property <bool> show-about: false;
+    out property <length> content-offset: content-scroll.viewport-y;
+    out property <length> content-height: content-scroll.viewport-height;
+    out property <length> content-visible-height: content-scroll.visible-height;
     in property <[PriceField]> model-one;
     in property <[PriceField]> model-two;
     in property <string> coefficient-one: "0";
@@ -199,8 +204,9 @@ export component MainWindow inherits Window {
                 Text { text: root.detail; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
             }
         }
-        ScrollView {
+        content-scroll := ScrollView {
             viewport-width: self.visible-width;
+            mouse-drag-pan-enabled: true;
             VerticalLayout {
                 spacing: 12px;
                 padding-right: 4px;
@@ -244,10 +250,11 @@ export component MainWindow inherits Window {
             }
             ScrollView {
                 viewport-width: self.visible-width;
+                mouse-drag-pan-enabled: true;
                 VerticalLayout {
                     alignment: start;
                     spacing: 20px;
-                    Text { text: "relay-price-calc-m 0.1.0\nRust + Slint · Android 版\n\n基于 A-2788553793/relay-price-calc\n应用源码：MIT License\n\n纯离线计算，不收集数据。\n关闭应用后不保留输入。"; color: Theme.text; wrap: word-wrap; vertical-stretch: 0; }
+                    Text { text: "relay-price-calc-m 0.1.2\nRust + Slint · Android 版\n\n基于 A-2788553793/relay-price-calc\n应用源码：MIT License\n\n纯离线计算，不收集数据。\n关闭应用后不保留输入。"; color: Theme.text; wrap: word-wrap; vertical-stretch: 0; }
                     AboutSlint { preferred-height: 160px; max-height: 160px; }
                 }
             }

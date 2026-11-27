@@ -2,7 +2,9 @@ fn main() {
     #[cfg(feature = "ui")]
     slint_build::compile_with_config(
         "ui/app.slint",
-        slint_build::CompilerConfiguration::new().with_style("fluent".into()),
+        slint_build::CompilerConfiguration::new()
+            .with_style("fluent".into())
+            .embed_resources(slint_build::EmbedResourcesKind::EmbedFiles),
     )
     .expect("Slint 手机界面编译失败");
 }

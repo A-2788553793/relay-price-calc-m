@@ -10,8 +10,12 @@ Copyright © SixtyFPS GmbH <info@slint.dev>。Slint 提供多许可，本 Androi
 
 许可原文：https://github.com/slint-ui/slint/blob/v1.14.1/LICENSES/LicenseRef-Slint-Royalty-free-2.0.md
 
+## Noto Sans CJK SC
+
+随应用嵌入官方 NotoSansCJKsc-Regular.otf，使用 SIL Open Font License 1.1，完整许可与版权声明见 assets/fonts/LICENSE 及 licenses/NotoSansCJK-OFL.txt。字体来源、固定提交及 SHA256 见 assets/fonts/README.md。此字体不受本项目 MIT 许可覆盖。
+
 ## 其他依赖
 
-Rust 传递依赖版本固定于 Cargo.lock。Android 使用 android-activity、jni、Skia/skia-safe 等，Linux 开发预览还使用 winit、software renderer；系统字体由操作系统提供，不随本项目分发。各依赖保有其自身的版权和许可。
+Rust 传递依赖版本固定于 Cargo.lock。Android 使用 android-activity、jni、Skia/skia-safe 等，Linux 开发预览还使用 winit、software renderer；中文主字体随本项目分发，其他系统回退字体由操作系统提供。各依赖保有其自身的版权和许可。
 
 此说明不替代各依赖的许可。正式分发二进制前应按实际目标的依赖图整理完整 notices（包括 Skia 及其内嵌依赖），保留其要求的版权声明。默认工作流一并上传本文件和 licenses/，但不声称已完成生产分发的完整法律审计。

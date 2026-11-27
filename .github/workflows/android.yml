@@ -78,6 +78,7 @@ jobs:
 
       - name: Check formatting, core tests and lint
         run: |
+          python3 scripts/check-font.py
           bash -n scripts/build-android.sh
           PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_verify_apk.py -v
           cargo fmt --all -- --check

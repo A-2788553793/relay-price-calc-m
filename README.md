@@ -8,7 +8,8 @@
 - 即时显示价格系数、便宜的一方和节省比例（以较贵模型为基准）。
 - 空白按 0；计算核心支持全角数字、句号和末尾百分号。
 - 无效数字、负数、缓存率超过 100% 和运算溢出均有提示。
-- 纵向滚动布局、数字键盘提示、浅色/深色、一键清空。
+- 纵向触屏拖动（包含输入框区域起手）、数字键盘提示、浅色/深色、一键清空。
+- 随包嵌入 Noto Sans CJK SC 中文字体，避免依赖设备中文字体回退。
 - 顶栏“关于”页包含 Slint 官方署名组件。
 - 完全离线，无账号、无网络请求、无联网权限；不保存输入，关闭后需重新填写。
 
@@ -53,6 +54,7 @@ r = 平均缓存率 / 100。示例输入 3、输出 15、缓存写入 3.75、缓
 固定 Rust 1.90.0、Slint 1.14.1，提交 Cargo.lock。
 
 ```bash
+python3 scripts/check-font.py
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_verify_apk.py -v
 cargo test --locked
 cargo fmt --all -- --check
@@ -62,7 +64,7 @@ cargo test --locked --features ui --test ui
 cargo run --locked --features ui
 ```
 
-Ubuntu 依赖：build-essential pkg-config libfontconfig1-dev libfreetype6-dev libxkbcommon-dev libx11-dev libxcb1-dev libx11-xcb-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libegl1-mesa-dev libgles2-mesa-dev。截图可用 fonts-noto-cjk。
+Ubuntu 依赖：build-essential pkg-config libfontconfig1-dev libfreetype6-dev libxkbcommon-dev libx11-dev libxcb1-dev libx11-xcb-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libegl1-mesa-dev libgles2-mesa-dev。中文字体已嵌入；无需另装系统中文字体。
 
 设置 RELAY_UI_SNAPSHOTS=1 运行 UI 测试可将真实软件渲染输出到 target/ui-shots/*.ppm；它们不是 Android 真机截图。
 
@@ -86,6 +88,6 @@ Slint 使用 Royalty-free Desktop, Mobile, and Web Applications License 2.0；�
 
 ## 验证状态
 
-**v0.1.1 已同步上游新公式。新版 APK 构建与发布状态请查看本次 Actions 及 [Releases](https://github.com/A-2788553793/relay-price-calc-m/releases)。以下第 5 次构建是旧公式版本，不包含本次更新。**
+**v0.1.2 修复中文字体与触屏拖动，保留 v0.1.1 新公式。新版 APK 构建与发布状态请查看 [Releases](https://github.com/A-2788553793/relay-price-calc-m/releases)。v0.1.1 已正式发布，但用户反馈缺字及无法触屏拖动，因此不能将其构建成功视作界面验收通过。**
 
 [历史：GitHub Actions 第 5 次构建已成功并生成 APK](https://github.com/A-2788553793/relay-price-calc-m/actions/runs/45951833346#artifacts)。登录 GitHub，在 Artifacts 下载 `relay-price-calc-m-arm64-test-apk` 并解压安装。详细证据见 VERIFICATION.md；**构建与签名检查通过不等于 Android 真机验收通过**。
